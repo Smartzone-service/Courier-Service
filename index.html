@@ -1,1012 +1,1152 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>West Bengal Agri Stack — ID Card Generator</title>
+<style id="lumi-runtime">/* luminous.css */
+/*
+ * Luminous runtime stylesheet — injected once into every generated widget's
+ * <head> by the C++ widget agent (id="lumi-runtime"). Single Source of Truth
+ * for ALL design tokens and pre-baked .lumi-* component classes. The SI prompts
+ * (design.md / html_generation.jinja2 / chart.jinja2) must NOT re-declare these
+ * tokens or component CSS; they only reference them.
+ *
+ * Sections:
+ *   1. Web fonts (Google Sans Flex + Google Sans Code)
+ *   2. Light token :root (from previewer tokens.css, verbatim)
+ *   3. Dark token overrides — REMAPPED to :root so canvas/D3 readers of
+ *      getComputedStyle(document.documentElement) resolve dark values (D3).
+ *   4. Short diagram/chart aliases (bridge legacy --surface / --chart-N names).
+ *   5. In-scope pre-baked .lumi-* component classes.
+ */
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-<!-- Razorpay SDK -->
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+/* ============================================================
+ * 1. WEB FONTS  (Google Sans Flex + Google Sans Code only)
+ *    Material Symbols Outlined is intentionally NOT loaded: no in-scope
+ *    .lumi-* control has a functional CSS glyph dependency on it, and the
+ *    icon ban forbids decorative icons (Decision D2).
+ * ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans+Flex:ital,wght@0,300..700;1,300..700&family=Google+Sans+Code:ital,wght,MONO@0,300..700,0..1;1,300..700,0..1&display=swap');
 
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+/* ============================================================
+ * 2. LIGHT TOKENS (:root)
+ * ============================================================ */
+:root {
+  --body-bg: transparent;
+  --ff-sans: 'Google Sans Flex', 'Google Sans Text', 'Google Sans', sans-serif;
+  --ff-mono: 'Google Sans Code', 'Google Sans Mono', monospace;
 
-  :root{ --deep-green:#0d4a2e; --leaf-green:#1e7e42; --bg:#eef7f0; --line:#d7e6da; --error:#d1242f; --success-bg:#d4edda; --success-text:#155724;}
-  
-  body { margin:0; font-family:'Inter', sans-serif; background:var(--bg); color:#16281d; padding:0; overflow-x: hidden; }
-  body.secure-mode { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-  body.secure-mode input, body.secure-mode select, body.secure-mode textarea { -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text; user-select: text; }
+  --lumi-sys-spacing--xxs: 2px;
+  --lumi-sys-spacing--xs: 4px;
+  --lumi-sys-spacing--s: 8px;
+  --lumi-sys-spacing--m: 12px;
+  --lumi-sys-spacing--l: 16px;
+  --lumi-sys-spacing--xl: 20px;
+  --lumi-sys-spacing--xxl: 24px;
+  --lumi-sys-spacing--3xl: 28px;
+  --lumi-sys-spacing--4xl: 36px;
 
-  @media print { body.secure-mode { display: none !important; } }
+  --lumi-sys-shape--none: 0px;
+  --lumi-sys-shape--extra-small: 4px;
+  --lumi-sys-shape--small: 8px;
+  --lumi-sys-shape--medium: 12px;
+  --lumi-sys-shape--large: 16px;
+  --lumi-sys-shape--large-increased: 20px;
+  --lumi-sys-shape--large-max: 24px;
+  --lumi-sys-shape--xl: 28px;
+  --lumi-sys-shape--xl-increased: 32px;
+  --lumi-sys-shape--xl-max: 40px;
+  --lumi-sys-shape--xxl: 48px;
+  --lumi-sys-shape--xxl-increased: 56px;
+  --lumi-sys-shape--full: 999px;
 
-  .wrap{ max-width:1450px; margin:0 auto; display:flex; gap:20px; flex-wrap:wrap; align-items: flex-start; padding: 20px; box-sizing: border-box;}
-  
-  #landingScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
-  .start-btn { background: var(--leaf-green); color: #fff; padding: 15px 35px; font-size: 20px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: 0.3s; }
-  .start-btn:hover { background: var(--deep-green); transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
-  #mainApp { display: none; } 
+  --lumi-sys-elevation--level1: 0 0 20px 0 rgba(0, 0, 0, 0.04);
+  --lumi-sys-elevation--level2: 0 0 20px 0 rgba(0, 0, 0, 0.11);
 
-  .sidebar{ flex:1; min-width:320px; background:#fff; padding:20px; border-radius:12px; border:1px solid var(--line); box-shadow:0 4px 6px rgba(0,0,0,0.05); position: sticky; top: 20px; max-height: 95vh; overflow-y: auto; box-sizing: border-box;}
-  
-  .preview-area { flex: 1.5; min-width: 320px; background: #fff; padding: 20px; border-radius: 12px; border: 1px solid var(--line); text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; box-sizing: border-box; transition: 0.4s ease; }
-  
-  .header-flex { display: flex; justify-content: space-between; align-items: center; border-bottom:2px solid var(--line); padding-bottom:10px; margin-bottom:15px; flex-wrap: wrap; gap: 10px;}
-  h2{ font-size:18px; color:var(--deep-green); margin:0; }
-  .admin-btn { background: #f0f0f0; border: 1px solid #ccc; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; color: #444; transition: 0.3s;}
-  .admin-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
-  
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;}
-  .form-group { display: flex; flex-direction: column; text-align: left; position: relative;}
-  .form-group label { font-size: 12px; font-weight: 600; color: #3f6b4c; margin-bottom: 4px;}
-  .form-group label span.req { color: var(--error); }
-  .form-group input, .form-group select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; font-family: 'Inter', sans-serif; box-sizing: border-box; width: 100%;}
-  .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--leaf-green); }
-  .form-group input.invalid, .form-group select.invalid { border: 2px solid var(--error); background: #fff8f8;}
+  --lumi-sys-color--surface: #fdfcfc;
+  --lumi-sys-color--surface-dim: #f2f0f0;
+  --lumi-sys-color--surface-bright: #ffffff;
+  --lumi-sys-color--surface-background: #fdfcfc;
+  --lumi-sys-color--surface-accent: #9dd2ff;
+  --lumi-sys-color--surface-container: #f2f0f0;
+  --lumi-sys-color--surface-container-high: #e6e6e6;
+  --lumi-sys-color--surface-translucent: rgba(255, 255, 255, 0.88);
+  --lumi-sys-color--on-surface: #000000;
+  --lumi-sys-color--on-surface-default: #000000;
+  --lumi-sys-color--on-surface-variant: rgba(0, 0, 0, 0.55);
+  --lumi-sys-color--on-surface-de-emphasis: rgba(0, 0, 0, 0.55);
+  --lumi-sys-color--on-surface-low: rgba(0, 0, 0, 0.08);
+  --lumi-sys-color--positive: #008052;
+  --lumi-sys-color--positive-container: #daf9d4;
+  --lumi-sys-color--on-positive-container: #009954;
+  --lumi-sys-color--error: #de2d29;
+  --lumi-sys-color--error-container: #ffdeec;
+  --lumi-sys-color--on-error-container: #de2d29;
+  --lumi-sys-color--accent: #9dd2ff;
+  --lumi-sys-color--accent-container: #dcf1ff;
+  --lumi-sys-color--accent-fixed: #3186ff;
+  --lumi-sys-color--primary: #3186ff;
+  --lumi-sys-color--on-primary: #ffffff;
+  --lumi-sys-color--black: #000000;
+  --lumi-sys-color--white: #ffffff;
+  --lumi-sys-color--outline: #727676;
+  --lumi-sys-color--stroke-default: #e3e3e3;
 
-  .photo-upload-box { display: block; border: 1px dashed var(--leaf-green); border-radius: 6px; padding: 15px; text-align: center; background: #eaf7ee; margin-bottom: 15px; transition: 0.3s; position: relative;}
-  .photo-upload-box.invalid { border: 2px dashed var(--error); background: #fff8f8; }
-  .photo-actions { display: flex; justify-content: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-  .photo-btn { background: #fff; border: 1px solid var(--leaf-green); color: var(--leaf-green); padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-  .photo-btn:hover { background: var(--leaf-green); color: #fff; }
-  
-  .btn{ background:var(--leaf-green); color:#fff; border:none; padding:12px 15px; border-radius:6px; font-weight:600; cursor:pointer; width:100%; font-size:15px; transition:0.2s; box-sizing: border-box;}
-  .btn:hover{ background:var(--deep-green); }
-  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  --lumi-sys-opacity-state--hover: 0.08;
+  --lumi-sys-opacity-state--focus: 0.08;
+  --lumi-sys-opacity-state--pressed: 0.12;
+  --lumi-sys-opacity-state--disabled: 0.12;
+  --lumi-sys-opacity-state--disabled-label: 0.38;
 
-  .canvas-wrapper { overflow: auto; border: 1px solid #ccc; border-radius: 8px; background: #fdfdfd; padding: 10px; margin-top: 10px; display: block; text-align: center; position: relative; width: 100%; box-sizing: border-box;}
-  #previewCanvas { max-width: 100%; height: auto; transition: width 0.2s ease; transform-origin: top center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: inline-block; }
-  
-  .zoom-controls { display: flex; justify-content: center; gap: 10px; margin-top: 10px; flex-wrap: wrap;}
-  .zoom-btn { background: #e0e0e0; border: 1px solid #bbb; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; }
-  .zoom-btn:hover { background: #d0d0d0; }
-  .flip-btn { background: #176882; color: #fff; border: 1px solid #114e61; }
-  
-  /* --- PREMIUM ADMIN UI STYLES --- */
-  .admin-section { display: none; background: #0f172a; padding: 25px; margin-bottom: 20px; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); color: #f8fafc; }
-  .admin-tabs { display: flex; background: #1e293b; padding: 8px; border-radius: 12px; margin-bottom: 25px; gap: 10px; flex-wrap: wrap; border: 1px solid #334155;}
-  .admin-tab { flex: 1; min-width: 100px; text-align: center; padding: 12px; font-size: 13px; font-weight: 700; color: #94a3b8; cursor: pointer; border-radius: 8px; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 6px;}
-  .admin-tab:hover { background: #334155; color: #e2e8f0; }
-  .admin-tab.active { background: #3b82f6; color: #fff; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4); transform: translateY(-2px); }
-  
-  .tab-content { display: none; animation: fadeIn 0.4s ease; }
-  .tab-content.active { display: block; }
-  @keyframes fadeIn { from {opacity: 0; transform: translateY(10px);} to {opacity: 1; transform: translateY(0);} }
-  
-  .controls-box { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; margin-top: 15px; box-shadow: inset 0 2px 10px rgba(0,0,0,0.1); }
-  .control-group-title { font-size: 14px; font-weight: 700; color: #cbd5e1; margin: 10px 0 15px 0; border-bottom: 1px solid #334155; padding-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px;}
-  .control-row { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom: 12px;}
-  
-  .control-group-sm { display:flex; justify-content:space-between; align-items:center; font-size:12px; background: #0f172a; padding: 8px 12px; border: 1px solid #334155; border-radius: 8px;}
-  .control-group-sm label { color: #94a3b8; font-weight: 600; }
-  .control-group-sm input { width:65px; padding:6px; font-size: 13px; text-align: center; border:1px solid #475569; border-radius:6px; background: #1e293b; color: #f8fafc; font-weight: 600; transition: 0.2s;}
-  .control-group-sm input:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 5px rgba(59,130,246,0.5); }
+  --lumi-sys-color--code-background: #000000;
+  --lumi-sys-color--code-primary-text: #ffffff;
+  --lumi-sys-color--code-blue-text: #4fa0ff;
+  --lumi-sys-color--code-green-text: #60d673;
+  --lumi-sys-color--code-grey-text: #808080;
+  --lumi-sys-color--code-pink-text: #ff96da;
+  --lumi-sys-color--code-purple-text: #969dff;
+  --lumi-sys-color--code-red-text: #ff5a59;
+  --lumi-sys-color--code-yellow-text: #ffdb0f;
 
-  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 15px; margin-bottom: 20px; }
-  .stat-card { padding: 20px 10px; border-radius: 12px; color: white; text-align: center; position: relative; overflow: hidden; z-index: 1; border: 1px solid rgba(255,255,255,0.1); transition: 0.4s;}
-  .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
-  .stat-total { background: linear-gradient(135deg, #059669, #064e3b); }
-  .stat-admin { background: linear-gradient(135deg, #2563eb, #1e3a8a); }
-  .stat-customer { background: linear-gradient(135deg, #d97706, #78350f); }
-  .stat-revenue { background: linear-gradient(135deg, #7c3aed, #4c1d95); }
-  .stat-today { background: linear-gradient(135deg, #db2777, #831843); }
-  .stat-number { font-size: 32px; font-weight: 800; line-height: 1; margin-bottom: 8px; }
-  .stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; }
-  
-  .txn-search { width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #fff; font-family: 'Inter'; outline: none;}
-  .txn-search:focus { border-color: #3b82f6; }
-  
-  .txn-table { width:100%; border-collapse:collapse; font-size:12px; text-align:left; background: #0f172a; border-radius: 8px; overflow: hidden; }
-  .txn-table th { background:#1e293b; padding:10px; border-bottom:2px solid #334155; color:#cbd5e1;}
-  .txn-table td { padding:10px; border-bottom:1px solid #334155; color:#94a3b8;}
-  
-  .modal-overlay { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); align-items: center; justify-content: center;}
-  .modal-content { background: #fff; padding: 25px; border-radius: 12px; max-width: 90%; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); box-sizing: border-box;}
-  .auth-modal { width: 300px; }
-  .auth-modal input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size:14px; }
-  
-  .crop-container { width: 100%; max-height: 350px; overflow: hidden; margin-bottom: 15px; background: #eee;}
-  .crop-container img { max-width: 100%; display: block; }
-  .slider-container { margin-bottom: 15px; text-align: left; background: #f9f9f9; padding: 10px; border-radius: 6px; border: 1px solid #ddd;}
-  input[type=range] { width: 100%; cursor: pointer;}
-  .crop-actions { display: flex; justify-content: space-between; gap: 10px; margin-top:10px; }
-  .btn-cancel { background: #888; } 
+  --lumi-sys-color--chart-series-1: #2575fc;
+  --lumi-sys-color--chart-series-2: #5b6e9e;
+  --lumi-sys-color--chart-series-3: #228a49;
+  --lumi-sys-color--chart-series-4: #62991b;
+  --lumi-sys-color--chart-series-5: #1e564d;
+  --lumi-sys-color--chart-series-6: #526a45;
+  --lumi-sys-color--chart-series-7: #2780c4;
+  --lumi-sys-color--chart-series-8: #997112;
+  --lumi-sys-color--chart-series-9: #705ec2;
+  --lumi-sys-color--chart-series-10: #c84288;
+}
 
-  #customContextMenu { display: none; position: absolute; background: #fff; border: 1px solid #d7e6da; box-shadow: 0 4px 6px rgba(0,0,0,0.15); z-index: 2000; border-radius: 6px; overflow: hidden; width: 160px; }
-  .context-item { padding: 12px 15px; cursor: pointer; font-size: 14px; color: var(--deep-green); font-weight: 600; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
-  .context-item:hover { background: #eaf7ee; }
+/* ============================================================
+ * 3. DARK TOKENS  (REMAPPED to :root — Decision D3)
+ *    Canvas / Chart.js / D3 read getComputedStyle(document.documentElement);
+ *    the theme-sync listener sets data-theme="dark" on <html>, so dark values
+ *    MUST live on :root (not scoped to body) to prevent black-chart regressions.
+ * ============================================================ */
+:root[data-theme="dark"],
+body.dark-mode,
+:root[data-theme="dark"] body {
+  --body-bg: #0f0f0f;
+  --lumi-sys-elevation--level1: 0 0 20px 0 rgba(0, 0, 0, 0.28);
+  --lumi-sys-elevation--level2: 0 0 20px 0 rgba(0, 0, 0, 0.40);
 
-  #customAlertOverlay { display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
-  .alert-box { background: #fff; padding: 25px; border-radius: 8px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); max-width: 350px; width: 90%; animation: popIn 0.3s ease; border-top: 5px solid var(--leaf-green);}
-  .alert-message { font-size: 15px; color: var(--deep-green); margin-bottom: 20px; font-weight: 500; line-height: 1.5;}
-  @keyframes popIn { from { transform: scale(0.8); opacity: 0;} to { transform: scale(1); opacity: 1;} }
+  --lumi-sys-color--surface: #0f0f0f;
+  --lumi-sys-color--surface-dim: #141414;
+  --lumi-sys-color--surface-bright: #1c1c1c;
+  --lumi-sys-color--surface-background: #0f0f0f;
+  --lumi-sys-color--surface-accent: #14204f;
+  --lumi-sys-color--surface-container: #141414;
+  --lumi-sys-color--surface-container-high: #1c1c1c;
+  --lumi-sys-color--surface-translucent: rgba(24, 24, 27, 0.88);
+  --lumi-sys-color--on-surface: #e0e0e0;
+  --lumi-sys-color--on-surface-default: #e0e0e0;
+  --lumi-sys-color--on-surface-variant: rgba(255, 255, 255, 0.55);
+  --lumi-sys-color--on-surface-de-emphasis: rgba(255, 255, 255, 0.55);
+  --lumi-sys-color--on-surface-low: rgba(255, 255, 255, 0.12);
+  --lumi-sys-color--positive: #0ebc5f;
+  --lumi-sys-color--positive-container: #002220;
+  --lumi-sys-color--on-positive-container: #0ebc5f;
+  --lumi-sys-color--error: #ff4c45;
+  --lumi-sys-color--error-container: #3c0202;
+  --lumi-sys-color--on-error-container: #ff4c45;
+  --lumi-sys-color--accent: #1f3b9b;
+  --lumi-sys-color--accent-container: #192967;
+  --lumi-sys-color--accent-fixed: #3186ff;
+  --lumi-sys-color--primary: #9dd2ff;
+  --lumi-sys-color--on-primary: #192967;
+  --lumi-sys-color--black: #000000;
+  --lumi-sys-color--white: #ffffff;
+  --lumi-sys-color--outline: #9a9b9c;
+  --lumi-sys-color--stroke-default: #2d2f38;
 
-  .badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
-  .badge-success { background: #dcfce7; color: #166534; }
-  .badge-fail { background: #fee2e2; color: #991b1b; }
+  --lumi-sys-color--code-background: #141414;
+  --lumi-sys-color--code-primary-text: #ffffff;
+  --lumi-sys-color--code-blue-text: #4fa0ff;
+  --lumi-sys-color--code-green-text: #60d673;
+  --lumi-sys-color--code-grey-text: #808080;
+  --lumi-sys-color--code-pink-text: #ff96da;
+  --lumi-sys-color--code-purple-text: #969dff;
+  --lumi-sys-color--code-red-text: #ff5a59;
+  --lumi-sys-color--code-yellow-text: #ffdb0f;
 
-  @media (max-width: 900px) {
-    .wrap { flex-direction: column; padding: 10px; }
-    .sidebar { position: static; max-height: none; min-width: 100%; width: 100%; overflow-y: visible; }
-    .preview-area { min-width: 100%; width: 100%; }
-    .form-grid { grid-template-columns: 1fr; }
-    .stat-grid { grid-template-columns: 1fr 1fr; }
+  --lumi-sys-color--chart-series-1: #9dd2ff;
+  --lumi-sys-color--chart-series-2: #96a7d6;
+  --lumi-sys-color--chart-series-3: #50e389;
+  --lumi-sys-color--chart-series-4: #c8f585;
+  --lumi-sys-color--chart-series-5: #f5f2e6;
+  --lumi-sys-color--chart-series-6: #dcd8c0;
+  --lumi-sys-color--chart-series-7: #82c7ff;
+  --lumi-sys-color--chart-series-8: #f5d77f;
+  --lumi-sys-color--chart-series-9: #d9ceff;
+  --lumi-sys-color--chart-series-10: #ffa6d7;
+}
+
+/* ============================================================
+ * 3b. OS-LEVEL DARK FALLBACK  (prefers-color-scheme)
+ *     A prior refactor introduced this stylesheet and moved the dark tokens onto
+ *     :root[data-theme="dark"], but dropped the @media (prefers-color-scheme:
+ *     dark) trigger that widgets previously carried in their own <style>.
+ *     Inline widgets whose host sends no set-theme / data-theme message therefore
+ *     stayed on the light --surface (#fdfcfc), rendering white in dark mode.
+ *     Re-apply the dark values on OS dark; an explicit host data-theme="light"
+ *     still opts back to light. Keep in sync with the :root[data-theme="dark"]
+ *     block above.
+ * ============================================================ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --body-bg: #0f0f0f;
+    --lumi-sys-elevation--level1: 0 0 20px 0 rgba(0, 0, 0, 0.28);
+    --lumi-sys-elevation--level2: 0 0 20px 0 rgba(0, 0, 0, 0.40);
+
+    --lumi-sys-color--surface: #0f0f0f;
+    --lumi-sys-color--surface-dim: #141414;
+    --lumi-sys-color--surface-bright: #1c1c1c;
+    --lumi-sys-color--surface-background: #0f0f0f;
+    --lumi-sys-color--surface-accent: #14204f;
+    --lumi-sys-color--surface-container: #141414;
+    --lumi-sys-color--surface-container-high: #1c1c1c;
+    --lumi-sys-color--surface-translucent: rgba(24, 24, 27, 0.88);
+    --lumi-sys-color--on-surface: #e0e0e0;
+    --lumi-sys-color--on-surface-default: #e0e0e0;
+    --lumi-sys-color--on-surface-variant: rgba(255, 255, 255, 0.55);
+    --lumi-sys-color--on-surface-de-emphasis: rgba(255, 255, 255, 0.55);
+    --lumi-sys-color--on-surface-low: rgba(255, 255, 255, 0.12);
+    --lumi-sys-color--positive: #0ebc5f;
+    --lumi-sys-color--positive-container: #002220;
+    --lumi-sys-color--on-positive-container: #0ebc5f;
+    --lumi-sys-color--error: #ff4c45;
+    --lumi-sys-color--error-container: #3c0202;
+    --lumi-sys-color--on-error-container: #ff4c45;
+    --lumi-sys-color--accent: #1f3b9b;
+    --lumi-sys-color--accent-container: #192967;
+    --lumi-sys-color--accent-fixed: #3186ff;
+    --lumi-sys-color--primary: #9dd2ff;
+    --lumi-sys-color--on-primary: #192967;
+    --lumi-sys-color--black: #000000;
+    --lumi-sys-color--white: #ffffff;
+    --lumi-sys-color--outline: #9a9b9c;
+    --lumi-sys-color--stroke-default: #2d2f38;
+
+    --lumi-sys-color--code-background: #141414;
+    --lumi-sys-color--code-primary-text: #ffffff;
+    --lumi-sys-color--code-blue-text: #4fa0ff;
+    --lumi-sys-color--code-green-text: #60d673;
+    --lumi-sys-color--code-grey-text: #808080;
+    --lumi-sys-color--code-pink-text: #ff96da;
+    --lumi-sys-color--code-purple-text: #969dff;
+    --lumi-sys-color--code-red-text: #ff5a59;
+    --lumi-sys-color--code-yellow-text: #ffdb0f;
+
+    --lumi-sys-color--chart-series-1: #9dd2ff;
+    --lumi-sys-color--chart-series-2: #96a7d6;
+    --lumi-sys-color--chart-series-3: #50e389;
+    --lumi-sys-color--chart-series-4: #c8f585;
+    --lumi-sys-color--chart-series-5: #f5f2e6;
+    --lumi-sys-color--chart-series-6: #dcd8c0;
+    --lumi-sys-color--chart-series-7: #82c7ff;
+    --lumi-sys-color--chart-series-8: #f5d77f;
+    --lumi-sys-color--chart-series-9: #d9ceff;
+    --lumi-sys-color--chart-series-10: #ffa6d7;
   }
-</style>
-</head>
-<body class="secure-mode">
+}
 
-<div id="customAlertOverlay">
-  <div class="alert-box">
-    <div id="customAlertMessage" class="alert-message">Message</div>
-    <button class="btn" onclick="document.getElementById('customAlertOverlay').style.display='none'">OK</button>
+/* ============================================================
+ * 4. SHORT DIAGRAM / CHART ALIASES
+ *    Legacy diagram.md and chart.jinja2 reference short names such as
+ *    --surface, --on-surface, --chart-1..10, --primary, --r-full. These MUST
+ *    resolve to the canonical --lumi-sys-color--* tokens (which flip in dark
+ *    mode) — otherwise every diagram var() falls back to black (historical
+ *    mass-regression bug #4). Light-hex fallbacks are a last resort only.
+ * ============================================================ */
+:root {
+  /* surfaces */
+  --surface: var(--lumi-sys-color--surface, #fdfcfc);
+  --surface-dim: var(--lumi-sys-color--surface-dim, #f2f0f0);
+  --surface-bright: var(--lumi-sys-color--surface-bright, #ffffff);
+  --surface-container: var(--lumi-sys-color--surface-container, #f2f0f0);
+  --surface-container-high: var(--lumi-sys-color--surface-container-high, #e6e6e6);
+  --surface-container-lowest: var(--lumi-sys-color--surface, #ffffff);
+  --surface-accent: var(--lumi-sys-color--surface-accent, #9dd2ff);
+  --surface-translucent: var(--lumi-sys-color--surface-translucent, rgba(255, 255, 255, 0.88));
+  --surface-glass: var(--lumi-sys-color--surface-translucent, rgba(255, 255, 255, 0.88));
+  /* foreground */
+  --on-surface: var(--lumi-sys-color--on-surface, #000000);
+  --on-surface-variant: var(--lumi-sys-color--on-surface-variant, rgba(0, 0, 0, 0.55));
+  --on-surface-low: var(--lumi-sys-color--on-surface-low, rgba(0, 0, 0, 0.08));
+  /* accents / brand */
+  --primary: var(--lumi-sys-color--primary, #3186ff);
+  --primary-container: var(--lumi-sys-color--accent-container, #dcf1ff);
+  --accent: var(--lumi-sys-color--accent, #9dd2ff);
+  --accent-container: var(--lumi-sys-color--accent-container, #dcf1ff);
+  --accent-fixed: var(--lumi-sys-color--accent-fixed, #3186ff);
+  /* status */
+  --positive: var(--lumi-sys-color--positive, #008052);
+  --positive-container: var(--lumi-sys-color--positive-container, #daf9d4);
+  --error: var(--lumi-sys-color--error, #de2d29);
+  --error-container: var(--lumi-sys-color--error-container, #ffdeec);
+  /* structure */
+  --outline: var(--lumi-sys-color--outline, #727676);
+  --stroke-default: var(--lumi-sys-color--stroke-default, #e3e3e3);
+  /* chart series 1..10 */
+  --chart-1: var(--lumi-sys-color--chart-series-1, #2575fc);
+  --chart-2: var(--lumi-sys-color--chart-series-2, #5b6e9e);
+  --chart-3: var(--lumi-sys-color--chart-series-3, #228a49);
+  --chart-4: var(--lumi-sys-color--chart-series-4, #62991b);
+  --chart-5: var(--lumi-sys-color--chart-series-5, #1e564d);
+  --chart-6: var(--lumi-sys-color--chart-series-6, #526a45);
+  --chart-7: var(--lumi-sys-color--chart-series-7, #2780c4);
+  --chart-8: var(--lumi-sys-color--chart-series-8, #997112);
+  --chart-9: var(--lumi-sys-color--chart-series-9, #705ec2);
+  --chart-10: var(--lumi-sys-color--chart-series-10, #c84288);
+  /* code palette */
+  --code-background: var(--lumi-sys-color--code-background, #000000);
+  --code-primary-text: var(--lumi-sys-color--code-primary-text, #ffffff);
+  /* spacing shorthands */
+  --spacing-xs: var(--lumi-sys-spacing--xs, 4px);
+  --spacing-s: var(--lumi-sys-spacing--s, 8px);
+  --spacing-m: var(--lumi-sys-spacing--m, 12px);
+  --spacing-l: var(--lumi-sys-spacing--l, 16px);
+  --spacing-xl: var(--lumi-sys-spacing--xl, 20px);
+  /* radius shorthands */
+  --r-s: var(--lumi-sys-shape--small, 8px);
+  --r-m: var(--lumi-sys-shape--medium, 12px);
+  --r-l: var(--lumi-sys-shape--large, 16px);
+  --r-full: var(--lumi-sys-shape--full, 999px);
+}
+
+/* ============================================================
+ * 5. IN-SCOPE PRE-BAKED COMPONENT CLASSES
+ *    Interactive controls + simple display components only (Decision D5).
+ *    Complex components (timeline, sequence, stepper, pros-cons, hero, HUD,
+ *    hotspot, media grid) are intentionally excluded.
+ * ============================================================ */
+
+/* Global font rendering quality + themed surface backdrop.
+ * background/color MUST be set here (SSoT) so the widget backdrop follows the
+ * light/dark surface token deterministically. Without this, a widget whose
+ * model-generated markup forgets `background: var(--surface)` on its root
+ * container falls back to the browser-default white body, producing a broken
+ * dark mode (light header/chart area behind a dark card). Regression source:
+ * batch1 PB-A02 dark. */
+html, body {
+  background: var(--body-bg, transparent) !important;
+  color: var(--on-surface) !important;
+  /* Auto-resizing iframe: content grows the frame, never scrolls the document.
+   * Model widgets already emit this; declared here as the SSoT default. */
+  overflow-y: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+}
+
+.widget-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding-inline: 0 !important;
+  box-sizing: border-box;
+}
+
+/* ============================================================
+ * SCROLLBAR DISCIPLINE (single source of truth)
+ *   Long lists/cards flow and let the iframe auto-resize (see the C++
+ *   NeutralizeInnerScroll pass, which removes accidental tiny scroll boxes).
+ *   For LEGITIMATE overflow that remains (wide tables, code, pan-containers,
+ *   large >=240px viewports) render a slim, theme-aware scrollbar.
+ *   One token carries the correct light/dark contrast (the auto-flipped
+ *   stroke token is too dark on #0f0f0f), referenced once = SSoT.
+ * ============================================================ */
+:root { --lumi-scrollbar-thumb: rgba(0, 0, 0, 0.20); }
+:root[data-theme="dark"], body.dark-mode { --lumi-scrollbar-thumb: rgba(255, 255, 255, 0.20); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --lumi-scrollbar-thumb: rgba(255, 255, 255, 0.20); }
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--lumi-scrollbar-thumb) transparent;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: var(--lumi-scrollbar-thumb);
+  border-radius: var(--lumi-sys-shape--full, 999px);
+}
+
+/* --- Buttons --- */
+/* Universal button fallback (element specificity 0,0,1) — beats `* { padding: 0 }`
+   author resets (0,0,0) while still yielding to any author class selector (0,1,0). */
+button {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lumi-sys-spacing--xs, 6px);
+  min-height: 36px;
+  padding: 6px 16px;
+  font-family: var(--ff-sans, 'Google Sans Flex', 'Google Sans', sans-serif);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--on-surface, #000000);
+  background-color: var(--surface-bright, #ffffff);
+  border: 1px solid var(--stroke-default, #e3e3e3);
+  border-radius: var(--lumi-sys-shape--full, 999px);
+  cursor: pointer;
+  user-select: none;
+  box-sizing: border-box;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+button:hover {
+  background-color: var(--surface-container-high, #e6e6e6);
+}
+button.active, button.is-active, button.selected, button.is-selected, button[aria-pressed="true"], button[aria-selected="true"] {
+  background-color: var(--accent-container, #dcf1ff);
+  color: var(--accent-fixed, #3186ff);
+  border-color: transparent;
+}
+
+.lumi-btn, [class^="lumi-btn-"], [class*=" lumi-btn-"] { display: inline-flex; align-items: center; justify-content: center; gap: var(--lumi-sys-spacing--s, 8px); min-height: 40px; padding: 0px 20px; font-family: var(--ff-sans, 'Google Sans Flex', 'Google Sans', sans-serif); font-size: 14px; font-weight: 500; line-height: 20px; border-radius: var(--lumi-sys-shape--full, 999px); border: 1px solid var(--lumi-sys-color--stroke-default, #e3e3e3); cursor: pointer; user-select: none; transition: background-color 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s; text-decoration: none; box-sizing: border-box; white-space: nowrap; }
+.lumi-btn:active, .lumi-btn.is-pressed, [class^="lumi-btn-"]:active, [class*=" lumi-btn-"]:active { transform: scale(0.98); }
+.lumi-btn--tonal, .lumi-btn-tonal, .lumi-btn--secondary, .lumi-btn-secondary, [class^="lumi-btn-"], [class*=" lumi-btn-"] { background-color: var(--lumi-sys-color--surface-bright, #ffffff); color: var(--lumi-sys-color--on-surface-default, #000000); }
+.lumi-btn--tonal:hover, .lumi-btn-tonal:hover, .lumi-btn--secondary:hover, .lumi-btn-secondary:hover, [class^="lumi-btn-"]:hover, [class*=" lumi-btn-"]:hover { background-color: var(--lumi-sys-color--surface-container-high, #e6e6e6); }
+.lumi-btn--accent, .lumi-btn-accent, .lumi-btn--primary, .lumi-btn-primary { background-color: var(--lumi-sys-color--accent, #9dd2ff); color: var(--lumi-sys-color--on-surface-default, #000000); border-color: transparent; }
+.lumi-btn--accent:hover, .lumi-btn-accent:hover, .lumi-btn--primary:hover, .lumi-btn-primary:hover { background-color: var(--lumi-sys-color--accent-container, #dcf1ff); }
+.lumi-btn--bright, .lumi-btn-bright { background-color: var(--lumi-sys-color--surface-bright, #ffffff); color: var(--lumi-sys-color--on-surface-default, #000000); border-color: var(--lumi-sys-color--stroke-default, #e3e3e3); box-shadow: none; }
+.lumi-btn--bright:hover, .lumi-btn-bright:hover { background-color: var(--lumi-sys-color--surface-container-high, #e6e6e6); }
+.lumi-btn--ghost, .lumi-btn-ghost, .lumi-btn--on-surface { background-color: var(--lumi-sys-color--on-surface-low, rgba(0, 0, 0, 0.04)); color: var(--lumi-sys-color--on-surface-default, #000000); border-color: transparent; }
+.lumi-btn--ghost:hover, .lumi-btn-ghost:hover, .lumi-btn--on-surface:hover { background-color: var(--lumi-sys-color--on-surface-low, rgba(0, 0, 0, 0.08)); }
+.lumi-btn--translucent { background-color: rgba(255, 255, 255, 0.25); backdrop-filter: blur(12px); color: var(--lumi-sys-color--on-surface-default, #000000); border-color: rgba(255, 255, 255, 0.3); }
+.lumi-btn--translucent:hover { background-color: rgba(255, 255, 255, 0.35); }
+.lumi-btn--small, .lumi-btn-small { min-height: 36px; padding: 0px 16px; font-size: 13px; line-height: 18px; gap: var(--lumi-sys-spacing--xs, 4px); }
+.lumi-btn--xsmall, .lumi-btn-xsmall { min-height: 24px; padding: 0px 10px; font-size: 11px; line-height: 16px; gap: 4px; }
+.lumi-btn:disabled, .lumi-btn.is-disabled, [class^="lumi-btn-"]:disabled, [class*=" lumi-btn-"]:disabled { opacity: var(--lumi-sys-opacity-state--disabled, 0.38); cursor: not-allowed; pointer-events: none; }
+.lumi-btn.is-selected, .lumi-btn.selected, .lumi-btn.is-active, .lumi-btn.active, .lumi-btn[aria-pressed="true"], .lumi-btn[aria-selected="true"] { background-color: var(--lumi-sys-color--accent-container, #dcf1ff); color: var(--lumi-sys-color--on-surface-default, #000000); border-color: transparent; }
+.lumi-btn.is-selected:hover, .lumi-btn.selected:hover, .lumi-btn.is-active:hover, .lumi-btn.active:hover, .lumi-btn[aria-pressed="true"]:hover, .lumi-btn[aria-selected="true"]:hover { background-color: var(--lumi-sys-color--accent, #9dd2ff); }
+
+/* --- Switch --- */
+.lumi-switch { display: inline-flex; align-items: center; gap: var(--lumi-sys-spacing--s, 8px); cursor: pointer; font-family: var(--ff-sans, 'Google Sans Flex', 'Google Sans', sans-serif); font-size: 15px; color: var(--lumi-sys-color--on-surface-default, #000000); user-select: none; }
+.lumi-switch input[type="checkbox"] { position: absolute; opacity: 0; width: 0px; height: 0px; pointer-events: none; }
+.lumi-switch__track { position: relative; display: inline-flex; align-items: center; width: 52px; height: 32px; background-color: var(--lumi-sys-color--surface-dim, #f2f0f0); border: 2px solid var(--lumi-sys-color--stroke-default, rgba(0, 0, 0, 0.12)); border-radius: var(--lumi-sys-shape--full, 999px); transition: background-color 0.2s, border-color 0.2s; flex-shrink: 0; box-sizing: border-box; }
+.lumi-switch__thumb, .lumi-switch__track::after { content: ""; position: absolute; top: 50%; left: 6px; transform: translateY(-50%); width: 16px; height: 16px; border-radius: 50%; background-color: var(--lumi-sys-color--on-surface-variant, #757575); transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.lumi-switch input[type="checkbox"]:checked + .lumi-switch__track { background-color: var(--lumi-sys-color--accent-fixed, #3186ff); border-color: transparent; }
+.lumi-switch input[type="checkbox"]:checked + .lumi-switch__track .lumi-switch__thumb, .lumi-switch input[type="checkbox"]:checked + .lumi-switch__track::after { left: 22px; width: 24px; height: 24px; background-color: rgb(255, 255, 255); }
+.lumi-switch input[type="checkbox"]:disabled + .lumi-switch__track { opacity: var(--lumi-sys-opacity-state--disabled, 0.38); cursor: not-allowed; }
+.lumi-switch--small .lumi-switch__track, .lumi-switch--mini .lumi-switch__track { width: 32px; height: 20px; }
+.lumi-switch--small .lumi-switch__thumb, .lumi-switch--small .lumi-switch__track::after, .lumi-switch--mini .lumi-switch__thumb, .lumi-switch--mini .lumi-switch__track::after { width: 12px; height: 12px; left: 2px; }
+.lumi-switch--small input[type="checkbox"]:checked + .lumi-switch__track .lumi-switch__thumb, .lumi-switch--small input[type="checkbox"]:checked + .lumi-switch__track::after, .lumi-switch--mini input[type="checkbox"]:checked + .lumi-switch__track .lumi-switch__thumb, .lumi-switch--mini input[type="checkbox"]:checked + .lumi-switch__track::after { left: 12px; width: 16px; height: 16px; }
+
+/* --- Checkbox --- */
+.lumi-checkbox-label { display: inline-flex; align-items: center; gap: var(--lumi-sys-spacing--s, 8px); cursor: pointer; font-family: var(--ff-sans, 'Google Sans Flex', 'Google Sans', sans-serif); font-size: 15px; color: var(--lumi-sys-color--on-surface-default, #000000); user-select: none; }
+.lumi-checkbox-label input[type="checkbox"] { position: absolute; opacity: 0; width: 0px; height: 0px; pointer-events: none; }
+.lumi-checkbox { position: relative; width: 24px; height: 24px; border-radius: var(--lumi-sys-shape--small, 8px); border: 2px solid var(--lumi-sys-color--on-surface-variant, rgba(0, 0, 0, 0.55)); background-color: transparent; transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-sizing: border-box; }
+.lumi-checkbox-label:hover .lumi-checkbox { background-color: var(--lumi-sys-color--on-surface-low, rgba(0, 0, 0, 0.04)); border-color: var(--lumi-sys-color--on-surface-default, #000000); }
+.lumi-checkbox-label input[type="checkbox"]:checked ~ .lumi-checkbox, .lumi-checkbox-label input[type="checkbox"]:indeterminate ~ .lumi-checkbox, .lumi-checkbox.is-indeterminate { background-color: var(--lumi-sys-color--on-surface-default, #000000); border-color: transparent; }
+.lumi-checkbox .lumi-checkmark { font-size: 18px; line-height: 1; color: var(--lumi-sys-color--surface, #ffffff); fill: var(--lumi-sys-color--surface, #ffffff); display: none; user-select: none; }
+.lumi-checkbox-label input[type="checkbox"]:checked ~ .lumi-checkbox .lumi-checkmark, .lumi-checkbox-label input[type="checkbox"]:checked ~ .lumi-checkbox .lumi-checkbox__check { display: block; }
+.lumi-checkbox-label input[type="checkbox"]:indeterminate ~ .lumi-checkbox .lumi-checkbox__indeterminate, .lumi-checkbox.is-indeterminate .lumi-checkbox__indeterminate { display: block; }
+.lumi-checkbox-label input[type="checkbox"]:disabled ~ .lumi-checkbox, .lumi-checkbox-label input[type="checkbox"]:disabled ~ span { opacity: var(--lumi-sys-opacity-state--disabled, 0.38); cursor: not-allowed; }
+
+/* --- Slider --- */
+.lumi-slider-container { display: flex; align-items: center; gap: var(--lumi-sys-spacing--m, 16px); width: 100%; }
+.lumi-slider-row { display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--xs, 4px); width: 100%; }
+.lumi-slider-label { font-family: var(--ff-sans, 'Google Sans Flex', 'Google Sans', sans-serif); font-size: 15px; font-weight: 400; color: var(--lumi-sys-color--on-surface-default, #000000); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lumi-slider { appearance: none; width: calc(100% + 28px); margin-left: -14px; margin-right: -14px; height: 40px; background: transparent; cursor: pointer; box-sizing: border-box; }
+.lumi-slider:focus { outline: none; }
+.lumi-slider::-webkit-slider-runnable-track { height: 4px; --thumb-center: calc(14px + (100% - 28px) * (var(--progress, 50%) / 100%)); --active-end: calc(var(--thumb-center) - 8px + (var(--progress, 50%) / 100%) * 6px); background-image: radial-gradient(circle at calc(100% - 18px) center, var(--lumi-sys-color--on-surface-variant, #757575) 2px, transparent 2.5px), linear-gradient( to right, transparent 0, transparent 14px, var(--lumi-sys-color--on-surface-default, #000000) 14px, var(--lumi-sys-color--on-surface-default, #000000) var(--active-end), transparent var(--active-end), transparent calc(var(--thumb-center) + 8px), var(--lumi-sys-color--stroke-default, rgba(0, 0, 0, 0.12)) calc(var(--thumb-center) + 8px), var(--lumi-sys-color--stroke-default, rgba(0, 0, 0, 0.12)) calc(100% - 16px), transparent calc(100% - 16px), transparent 100% ); border-radius: var(--lumi-sys-shape--full, 999px); border-width: medium; border-style: none; border-color: currentcolor; border-image: none; }
+.lumi-slider::-webkit-slider-thumb { appearance: none; width: 32px; height: 32px; border-radius: 50%; background-color: transparent; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect x='14' y='6' width='4' height='20' rx='2' fill='%23000000'/%3E%3C/svg%3E"); background-size: 32px 32px; background-repeat: no-repeat; background-position: center center; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; box-sizing: border-box; margin-top: -14px; cursor: pointer; transition: background-color 0.15s; }
+.lumi-slider:hover::-webkit-slider-thumb { background-color: var(--lumi-sys-color--on-surface-low, rgba(0, 0, 0, 0.08)); }
+.lumi-slider:active::-webkit-slider-thumb { background-color: var(--lumi-sys-color--on-surface-low, rgba(0, 0, 0, 0.12)); }
+.lumi-slider:disabled { opacity: var(--lumi-sys-opacity-state--disabled, 0.38); cursor: not-allowed; }
+.lumi-slider:disabled::-webkit-slider-thumb { cursor: not-allowed; box-shadow: none; }
+.lumi-slider-value { display: flex; align-items: center; justify-content: center; min-width: 64px; height: 40px; padding: 0px 12px; background-color: var(--lumi-sys-color--surface-dim, #f2f0f0); border-radius: var(--lumi-sys-shape--medium, 16px); font-family: var(--ff-mono, 'Google Sans Code', 'Google Sans Mono', monospace); font-size: 15px; font-weight: 400; color: var(--lumi-sys-color--on-surface-default, #000000); flex-shrink: 0; box-sizing: border-box; }
+
+/* --- Text input --- */
+.lumi-input-group { display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--xs, 4px); width: 100%; }
+.lumi-input-label { font-family: var(--ff-sans, 'Google Sans Flex', 'Google Sans', sans-serif); font-size: 14px; font-weight: 500; line-height: 20px; color: var(--lumi-sys-color--on-surface-default, #000000); }
+.lumi-input { appearance: none; width: 100%; min-height: 48px; padding: 0px 16px; font-family: var(--ff-sans, 'Google Sans Flex', 'Google Sans', sans-serif); font-size: 15px; font-weight: 400; line-height: 22px; color: var(--lumi-sys-color--on-surface-default, #000000); background-color: var(--lumi-sys-color--surface-bright, #ffffff); border: 1px solid var(--lumi-sys-color--stroke-default, rgba(0, 0, 0, 0.12)); border-radius: var(--lumi-sys-shape--large, 16px); background-clip: padding-box; outline: none; box-sizing: border-box; transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s; }
+.lumi-input::placeholder { color: var(--lumi-sys-color--on-surface-variant, rgba(0, 0, 0, 0.55)); opacity: 0.7; }
+.lumi-input:hover { border-color: var(--lumi-sys-color--on-surface-default, #000000); }
+.lumi-input:focus, .lumi-input:focus-visible { border-color: var(--lumi-sys-color--accent-fixed, #3186ff); box-shadow: 0 0 0 2px var(--lumi-sys-color--accent-container, rgba(49, 134, 255, 0.25)); }
+textarea.lumi-input, .lumi-input--area { min-height: 100px; padding: 12px 16px; resize: vertical; line-height: 22px; }
+.lumi-input.is-error, .lumi-input-group.is-error .lumi-input { border-color: var(--lumi-sys-color--error, #ff4c45); }
+.lumi-input-helper { font-family: var(--ff-sans, 'Google Sans Flex', 'Google Sans', sans-serif); font-size: 12px; line-height: 16px; color: var(--lumi-sys-color--on-surface-variant, rgba(0, 0, 0, 0.55)); }
+.lumi-input-group.is-error .lumi-input-helper, .lumi-input-helper--error { color: var(--lumi-sys-color--error, #ff4c45); }
+.lumi-input:disabled, .lumi-input.is-disabled { opacity: var(--lumi-sys-opacity-state--disabled, 0.38); background-color: var(--lumi-sys-color--surface-dim, #f2f0f0); cursor: not-allowed; }
+
+/* --- Focus ring --- */
+:focus-visible { outline: 2px solid var(--lumi-sys-color--on-surface-default, #000000) !important; outline-offset: 2px !important; box-shadow: none !important; }
+.lumi-btn:focus-visible, .lumi-switch input[type="checkbox"]:focus-visible + .lumi-switch__track, .lumi-checkbox-label input[type="checkbox"]:focus-visible ~ .lumi-checkbox, .lumi-slider:focus-visible::-webkit-slider-thumb, .lumi-input:focus-visible { outline: 2px solid var(--lumi-sys-color--on-surface-default, #000000); outline-offset: 2px; box-shadow: none; }
+
+/* --- Typography: Display / Headline / Body / Label --- */
+.lumi-display-l { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 42px; line-height: 48px; font-weight: 280; font-variation-settings: "wght" 280, "wdth" 100, "opsz" 42, "ROND" 100; }
+.lumi-display-l-emphasized { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 42px; line-height: 48px; font-weight: 450; font-variation-settings: "wght" 450, "wdth" 100, "opsz" 42, "ROND" 100; }
+.lumi-display-m { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 36px; line-height: 44px; font-weight: 320; font-variation-settings: "wght" 320, "wdth" 100, "opsz" 36, "ROND" 100; }
+.lumi-display-m-emphasized { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 36px; line-height: 44px; font-weight: 480; font-variation-settings: "wght" 480, "wdth" 100, "opsz" 36, "ROND" 100; }
+.lumi-display-s { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 32px; line-height: 38px; font-weight: 360; font-variation-settings: "wght" 360, "wdth" 100, "opsz" 32, "ROND" 100; }
+.lumi-display-s-emphasized { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 32px; line-height: 38px; font-weight: 500; font-variation-settings: "wght" 500, "wdth" 100, "opsz" 32, "ROND" 100; }
+.lumi-headline-l { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 28px; line-height: 36px; font-weight: 350; font-variation-settings: "wght" 350, "wdth" 100, "opsz" 28, "ROND" 20; }
+.lumi-headline-l-emphasized { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 28px; line-height: 36px; font-weight: 520; font-variation-settings: "wght" 520, "wdth" 100, "opsz" 28, "ROND" 20; }
+.lumi-headline-m { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 24px; line-height: 28px; font-weight: 380; font-variation-settings: "wght" 380, "wdth" 100, "opsz" 24, "ROND" 20; }
+.lumi-headline-m-emphasized { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 24px; line-height: 28px; font-weight: 540; font-variation-settings: "wght" 540, "wdth" 100, "opsz" 24, "ROND" 20; }
+.lumi-headline-s { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 20px; line-height: 24px; font-weight: 470; font-variation-settings: "wght" 470, "wdth" 94, "opsz" 20, "ROND" 20; }
+.lumi-headline-s-emphasized { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 20px; line-height: 24px; font-weight: 580; font-variation-settings: "wght" 580, "wdth" 94, "opsz" 20, "ROND" 20; }
+.lumi-body-l { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 17px; line-height: 24px; font-weight: 400; font-variation-settings: "wght" 400, "wdth" 92, "opsz" 17; }
+.lumi-body-l-emphasized { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 17px; line-height: 24px; font-weight: 540; font-variation-settings: "wght" 540, "wdth" 92, "opsz" 17; font-variant-numeric: tabular-nums; }
+.lumi-body-m { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 15px; line-height: 20px; font-weight: 400; font-variation-settings: "wght" 400, "wdth" 92, "opsz" 15; }
+.lumi-body-m-emphasized { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 15px; line-height: 20px; font-weight: 540; font-variation-settings: "wght" 540, "wdth" 92, "opsz" 15; font-variant-numeric: tabular-nums; }
+.lumi-body-s { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 13px; line-height: 17px; font-weight: 400; font-variation-settings: "wght" 400, "wdth" 92, "opsz" 13; }
+.lumi-body-s-emphasized { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 13px; line-height: 17px; font-weight: 540; font-variation-settings: "wght" 540, "wdth" 92, "opsz" 13; font-variant-numeric: tabular-nums; }
+.lumi-label-l { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 17px; line-height: 24px; font-weight: 370; font-variation-settings: "wght" 370, "wdth" 92, "opsz" 17; }
+.lumi-label-l-emphasized { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 17px; line-height: 24px; font-weight: 510; font-variation-settings: "wght" 510, "wdth" 92, "opsz" 17; }
+.lumi-label-m { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 15px; line-height: 20px; font-weight: 370; font-variation-settings: "wght" 370, "wdth" 92, "opsz" 15; }
+.lumi-label-m-emphasized { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 15px; line-height: 20px; font-weight: 510; font-variation-settings: "wght" 510, "wdth" 92, "opsz" 15; }
+.lumi-label-s { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 13px; line-height: 20px; font-weight: 370; font-variation-settings: "wght" 370, "wdth" 92, "opsz" 13; }
+.lumi-label-s-emphasized { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 13px; line-height: 20px; font-weight: 510; font-variation-settings: "wght" 510, "wdth" 92, "opsz" 13; }
+
+/* --- Typography: Monospace / Extended (Google Sans Code) --- */
+.lumi-blockquote { font-family: var(--ff-mono, 'Google Sans Code', monospace); font-style: italic; font-size: 22px; line-height: 30px; font-weight: 300; font-variation-settings: "wght" 300, "opsz" 22, "MONO" 0; }
+.lumi-takeaway { font-family: var(--ff-mono, 'Google Sans Code', monospace); font-style: italic; font-size: 17px; line-height: 24px; font-weight: 400; font-variation-settings: "wght" 400, "opsz" 17, "MONO" 0; }
+.lumi-caption { font-family: var(--ff-mono, 'Google Sans Code', monospace); font-style: italic; font-size: 13px; line-height: 20px; font-weight: 400; font-variation-settings: "wght" 400, "opsz" 13, "MONO" 0; }
+.lumi-code { font-family: var(--ff-mono, 'Google Sans Code', monospace); font-size: 15px; line-height: 20px; font-weight: 400; font-variation-settings: "wght" 400, "MONO" 1; }
+.lumi-bullet { font-family: var(--ff-mono, 'Google Sans Code', monospace); font-size: 15px; line-height: 24px; font-weight: 650; font-variation-settings: "wght" 650, "MONO" 1; }
+
+/* --- Cards & attribution --- */
+.lumi-summary-card { padding: var(--lumi-sys-spacing--l, 16px); background-color: var(--lumi-sys-color--surface-container, #f2f0f0); border-radius: var(--lumi-sys-shape--medium, 12px); color: var(--lumi-sys-color--on-surface-default, #000000); font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 15px; line-height: 20px; box-sizing: border-box; }
+.lumi-link-card { display: flex; align-items: center; justify-content: space-between; padding: var(--lumi-sys-spacing--l, 16px); background-color: var(--lumi-sys-color--surface-container, #f2f0f0); border-radius: var(--lumi-sys-shape--medium, 12px); text-decoration: none; color: var(--lumi-sys-color--on-surface-default, #000000); transition: background-color 0.15s; box-sizing: border-box; }
+.lumi-link-card:hover { background-color: var(--lumi-sys-color--surface-container-high, #e6e6e6); }
+.lumi-attribution-buffer { margin-top: var(--lumi-sys-spacing--xxl, 24px); font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 13px; color: var(--lumi-sys-color--on-surface-de-emphasis, rgba(0, 0, 0, 0.55)); }
+.lumi-card { background-color: var(--lumi-sys-color--surface-dim, #f2f0f0); border-radius: var(--lumi-sys-shape--large-max, 24px); padding: var(--lumi-sys-spacing--3xl, 28px); display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--s, 8px); width: 100%; box-sizing: border-box; }
+.lumi-card-title { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 20px; font-weight: 500; font-variation-settings: "wght" 470, "wdth" 94, "opsz" 20; color: var(--lumi-sys-color--on-surface, #000000); margin: 0px; }
+.lumi-card-subtitle { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 13px; font-weight: 400; font-variation-settings: "wght" 400, "wdth" 92, "opsz" 13; color: var(--lumi-sys-color--on-surface-variant, rgba(0, 0, 0, 0.55)); margin: 0px; }
+.lumi-card-body { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 15px; font-weight: 400; font-variation-settings: "wght" 400, "wdth" 92, "opsz" 15; color: var(--lumi-sys-color--on-surface, #000000); margin: var(--lumi-sys-spacing--xs, 4px) 0 0 0; }
+.lumi-overlay-card { background-color: var(--surface-translucent, rgba(255, 255, 255, 0.88)); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--stroke-default); border-radius: var(--lumi-sys-shape--medium, 12px); padding: var(--lumi-sys-spacing--m, 12px) var(--lumi-sys-spacing--l, 16px); color: var(--on-surface); box-shadow: var(--lumi-sys-elevation--level1); box-sizing: border-box; }
+
+/* --- Progress bar --- */
+.lumi-progress-tracker { display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--xs, 4px); width: 100%; }
+.lumi-progress-bar { width: 100%; height: 8px; background-color: var(--lumi-sys-color--stroke-default, #e3e3e3); border-radius: var(--lumi-sys-shape--full, 999px); overflow: hidden; }
+.lumi-progress-fill { height: 100%; background-color: var(--lumi-sys-color--accent-fixed, #3186ff); border-radius: var(--lumi-sys-shape--full, 999px); transition: width 0.3s; }
+
+/* --- Accordion (card group variant) --- */
+.lumi-accordion-group { display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--s, 8px); }
+.lumi-accordion-group .lumi-accordion-item { background-color: var(--lumi-sys-color--surface-container, #f2f0f0); border-radius: var(--lumi-sys-shape--medium, 12px); overflow: hidden; transition: background-color 0.15s; }
+.lumi-accordion-group .lumi-accordion-header { padding: var(--lumi-sys-spacing--l, 16px); font-family: var(--ff-sans, sans-serif); font-size: 15px; font-weight: 540; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center; color: var(--lumi-sys-color--on-surface-default, #000000); }
+.lumi-accordion-group .lumi-accordion-chevron { transition: transform 0.2s; font-size: 12px; }
+.lumi-accordion-group .lumi-accordion-item.active .lumi-accordion-chevron { transform: rotate(180deg); }
+.lumi-accordion-group .lumi-accordion-body { display: none; padding: 0 var(--lumi-sys-spacing--l, 16px) var(--lumi-sys-spacing--l, 16px) var(--lumi-sys-spacing--l, 16px); font-family: var(--ff-sans, sans-serif); font-size: 15px; color: var(--lumi-sys-color--on-surface-de-emphasis, rgba(0, 0, 0, 0.55)); line-height: 20px; }
+.lumi-accordion-group .lumi-accordion-item.active .lumi-accordion-body { display: block; }
+
+/* --- Accordion (borderless list variant) --- */
+.lumi-accordion { display: flex; flex-direction: column; width: 100%; border-top: 1px solid var(--lumi-sys-color--on-surface-low, rgba(0, 0, 0, 0.08)); }
+.lumi-accordion-item { display: flex; flex-direction: column; width: 100%; background: transparent; border-radius: 0px; border-bottom: 1px solid var(--lumi-sys-color--on-surface-low, rgba(0, 0, 0, 0.08)); }
+.lumi-accordion-header { display: flex; justify-content: space-between; align-items: center; padding: var(--lumi-sys-spacing--xl, 20px) 0; cursor: pointer; user-select: none; }
+.lumi-accordion-title { margin: 0px; color: var(--lumi-sys-color--on-surface-default, #000000); }
+.lumi-accordion-item.active .lumi-accordion-content { display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--l, 16px); }
+.lumi-accordion-content { display: none; padding-bottom: var(--lumi-sys-spacing--xxl, 24px); }
+.lumi-accordion-field { display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--xxs, 2px); }
+.lumi-accordion-field-label { margin: 0px; color: var(--lumi-sys-color--on-surface-default, #000000); }
+.lumi-accordion-field-val { margin: 0px; color: var(--lumi-sys-color--on-surface-default, #000000); }
+
+/* --- Segmented control --- */
+.lumi-segmented-group { display: flex; background-color: var(--lumi-sys-color--surface-container, #f2f0f0); padding: 4px; border-radius: var(--lumi-sys-shape--full, 999px); gap: 4px; }
+.lumi-segmented-btn { flex: 1 1 0%; padding: 8px 16px; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; border-radius: var(--lumi-sys-shape--full, 999px); background-color: transparent; font-family: var(--ff-sans, sans-serif); font-size: 14px; font-weight: 510; cursor: pointer; color: var(--lumi-sys-color--on-surface-de-emphasis, rgba(0, 0, 0, 0.55)); transition: 0.2s; }
+.lumi-segmented-btn.is-active { background-color: var(--lumi-sys-color--surface-bright, #ffffff); color: var(--lumi-sys-color--on-surface-default, #000000); box-shadow: var(--lumi-sys-elevation--level1); }
+
+/* --- Tabs --- */
+.lumi-tab-group { display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--4xl, 36px); width: 100%; }
+.lumi-tab-bar { display: flex; gap: var(--lumi-sys-spacing--l, 16px); padding-bottom: 0px; overflow-x: auto; scrollbar-width: none; }
+.lumi-tab-bar::-webkit-scrollbar { display: none; }
+.lumi-tab { height: 40px; padding: 0 var(--lumi-sys-spacing--xl, 20px); display: flex; align-items: center; justify-content: center; font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 17px; line-height: 24px; font-weight: 370; font-variation-settings: "wght" 370, "wdth" 92, "opsz" 17; color: var(--lumi-sys-color--on-surface-de-emphasis, rgba(0, 0, 0, 0.55)); background: transparent; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; border-radius: var(--lumi-sys-shape--full, 999px); cursor: pointer; white-space: nowrap; transition: background-color 0.15s, color 0.15s; }
+.lumi-tab:hover { color: var(--lumi-sys-color--on-surface-default, #000000); }
+.lumi-tab.active { background-color: var(--lumi-sys-color--surface-container-high, #f2f0f0); color: var(--lumi-sys-color--on-surface-default, #000000); font-weight: 510; font-variation-settings: "wght" 510, "wdth" 92, "opsz" 17; }
+.lumi-tab-content { display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--m, 12px); padding-top: 0px; padding-bottom: 0px; }
+.lumi-tab-content .lumi-body-l-emphasized, .lumi-tab-content .lumi-headline-s { margin: 0px; }
+.lumi-tab-content .lumi-body-l { margin: 0px; color: var(--lumi-sys-color--on-surface-default, #000000); }
+
+/* --- Callout / pullquote --- */
+.lumi-callout { display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--xs, 4px); width: 100%; }
+.lumi-callout .lumi-body-l-emphasized { margin: 0px; }
+.lumi-pullquote { display: flex; gap: var(--lumi-sys-spacing--xl, 20px); width: 100%; margin: 0px; }
+.lumi-pullquote-mark { width: 30px; height: 22px; flex-shrink: 0; margin-top: 4px; color: var(--lumi-sys-color--on-surface-default, #000000); }
+.lumi-pullquote-body { display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--l, 16px); flex: 1 1 0%; min-width: 0px; }
+p.lumi-pullquote-text, .lumi-pullquote-text { font-family: var(--ff-mono, 'Google Sans Code', monospace); font-style: italic; font-weight: 300; font-variation-settings: "wght" 300, "opsz" 22, "MONO" 0; color: var(--lumi-sys-color--on-surface-default, #000000); margin: 0px; font-size: 22px !important; line-height: 30px !important; }
+.lumi-pullquote-cite { display: flex; flex-direction: column; font-style: normal; }
+.lumi-pullquote-cite .lumi-de-emphasis { color: var(--lumi-sys-color--on-surface-de-emphasis, rgba(0, 0, 0, 0.55)); }
+
+/* --- Data table (simple) --- */
+.lumi-data-table-container { width: 100%; overflow-x: auto; border-radius: var(--lumi-sys-shape--medium, 12px); border: 1px solid var(--lumi-sys-color--stroke-default, rgba(0, 0, 0, 0.12)); }
+.lumi-data-table { width: 100%; border-collapse: collapse; font-family: var(--ff-sans, sans-serif); font-size: 14px; text-align: left; }
+.lumi-data-table th { padding: 12px 16px; font-weight: 600; background-color: var(--lumi-sys-color--surface-container, #f2f0f0); border-bottom: 1px solid var(--lumi-sys-color--stroke-default, rgba(0, 0, 0, 0.12)); color: var(--lumi-sys-color--on-surface-default, #000000); }
+.lumi-data-table td { padding: 12px 16px; border-bottom: 1px solid var(--lumi-sys-color--stroke-default, rgba(0, 0, 0, 0.12)); color: var(--lumi-sys-color--on-surface-default, #000000); }
+.lumi-data-table tr:last-child td { border-bottom-width: medium; border-bottom-style: none; border-bottom-color: currentcolor; }
+
+/* --- Table widget (prose-style) --- */
+.lumi-table-widget { display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--xxl, 24px); width: 100%; }
+.lumi-table-title { margin: 0px; color: var(--lumi-sys-color--on-surface-default, #000000); }
+.lumi-table { width: 100%; border-collapse: collapse; font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); text-align: left; }
+.lumi-table th { padding: 12px 16px 12px 0px; font-size: 17px; line-height: 24px; font-weight: 540; font-variation-settings: "wght" 540, "wdth" 92, "opsz" 17; color: var(--lumi-sys-color--on-surface-default, #000000); border-bottom: 1px solid var(--lumi-sys-color--on-surface-low, rgba(0, 0, 0, 0.08)); }
+.lumi-table td { padding: 16px 16px 16px 0px; font-size: 17px; line-height: 24px; font-weight: 400; font-variation-settings: "wght" 400, "wdth" 92, "opsz" 17; color: var(--lumi-sys-color--on-surface-default, #000000); border-bottom: 1px solid var(--lumi-sys-color--on-surface-low, rgba(0, 0, 0, 0.08)); }
+.lumi-table td:last-child, .lumi-table th:last-child { padding-right: 0px; }
+.lumi-table tr.lumi-table-ellipsis-row td { padding: 16px 0px 0px; border-bottom-width: medium; border-bottom-style: none; border-bottom-color: currentcolor; color: var(--lumi-sys-color--on-surface-variant, rgba(0, 0, 0, 0.55)); }
+
+/* --- Code block --- */
+.lumi-code-block { background-color: var(--lumi-sys-color--code-background, #000000); border-radius: var(--lumi-sys-shape--xl-max, 40px); padding: 32px; display: flex; flex-direction: column; gap: var(--lumi-sys-spacing--l, 16px); width: 100%; box-sizing: border-box; }
+.lumi-code-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+.lumi-code-lang { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 15px; font-weight: 500; font-variation-settings: "wght" 540, "wdth" 92, "opsz" 15; color: var(--lumi-sys-color--code-primary-text, #ffffff); }
+.lumi-code-copy { background: transparent; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; color: var(--lumi-sys-color--code-primary-text, #ffffff); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: var(--lumi-sys-shape--full, 999px); transition: background-color 0.2s; }
+.lumi-code-copy:hover { background-color: rgba(255, 255, 255, 0.1); }
+.lumi-code-snippet { margin: 0px; overflow-x: auto; width: 100%; }
+.lumi-code-snippet code { font-family: var(--ff-mono, 'Google Sans Code', monospace); font-size: 15px; line-height: 20px; color: var(--lumi-sys-color--code-primary-text, #ffffff); display: block; white-space: pre; }
+
+/* --- Section / prose --- */
+.lumi-section { display: flex; flex-direction: column; align-items: flex-start; width: 100%; }
+.lumi-section h1 { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 28px; line-height: 36px; font-weight: 350; font-variation-settings: "wght" 350, "wdth" 100, "opsz" 28; color: var(--lumi-sys-color--on-surface, #000000); margin-top: var(--lumi-sys-spacing--m, 12px); margin-bottom: var(--lumi-sys-spacing--xxl, 24px); }
+.lumi-section h1:first-child { margin-top: 0px; }
+.lumi-section h2 { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 24px; line-height: 28px; font-weight: 380; font-variation-settings: "wght" 380, "wdth" 100, "opsz" 24; color: var(--lumi-sys-color--on-surface, #000000); margin-top: var(--lumi-sys-spacing--m, 12px); margin-bottom: var(--lumi-sys-spacing--m, 12px); }
+.lumi-section h2:first-child { margin-top: 0px; }
+.lumi-section h3 { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 20px; line-height: 24px; font-weight: 470; font-variation-settings: "wght" 470, "wdth" 94, "opsz" 20; color: var(--lumi-sys-color--on-surface, #000000); margin-top: var(--lumi-sys-spacing--m, 12px); margin-bottom: var(--lumi-sys-spacing--xs, 4px); }
+.lumi-section h3:first-child { margin-top: 0px; }
+.lumi-section p { font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 17px; line-height: 24px; font-weight: 400; font-variation-settings: "wght" 400, "wdth" 92, "opsz" 17; color: var(--lumi-sys-color--on-surface, #000000); margin-top: 0px; margin-bottom: var(--lumi-sys-spacing--m, 12px); }
+.lumi-section p:last-child { margin-bottom: 0px; }
+.lumi-section ul { list-style: none; padding: 0px; margin: 0 0 var(--lumi-sys-spacing--m, 12px) 0; width: 100%; }
+.lumi-section ul:last-child { margin-bottom: 0px; }
+.lumi-section li { position: relative; padding-left: 40px; padding-bottom: 12px; font-family: var(--ff-sans, 'Google Sans Flex', sans-serif); font-size: 17px; line-height: 24px; font-weight: 400; font-variation-settings: "wght" 400, "wdth" 92, "opsz" 17; color: var(--lumi-sys-color--on-surface, #000000); box-sizing: border-box; }
+.lumi-section li:last-child { padding-bottom: 0px; }
+.lumi-section li::before { content: "○"; position: absolute; left: 3.5px; top: 0px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-family: var(--ff-mono, 'Google Sans Code', monospace); font-size: 15px; font-weight: 650; font-variation-settings: "MONO" 1, "wght" 650; color: var(--lumi-sys-color--on-surface, #000000); }
+.lumi-section li ul { margin-top: 12px; margin-bottom: 0px; padding-left: 40px; }
+
+/* --- Chart legend (1:1 series color match) --- */
+.lumi-chart-header, .lumi-chart-title { margin-bottom: 32px; }
+.lumi-chart-legend { display: flex; justify-content: center; align-items: center; gap: 24px; margin-top: 32px; padding-top: 0px; width: 100%; flex-wrap: wrap; }
+.lumi-legend-item { display: inline-flex; align-items: center; gap: 8px; }
+.lumi-legend-dot { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.lumi-legend-dot-swatch { width: 20px; height: 20px; border-radius: 50%; display: block; }
+span.lumi-legend-dot[style*="background"] { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.lumi-legend-label { font-family: var(--ff-mono, 'Google Sans Code', monospace); font-style: italic; font-size: 13px; font-weight: 400; line-height: 20px; color: var(--lumi-sys-color--on-surface, #000000); font-variation-settings: "MONO" 0; white-space: nowrap; }
+
+/* Canonical themed <select>. Uses element+class specificity (select.lumi-select)
+   so it intentionally wins over any model hand-rolled `.lumi-select` rule: the
+   runtime stylesheet is injected before widget <style> blocks, so a bare
+   `.lumi-select` (same specificity, later) would otherwise override it. This
+   provides appearance:none + a theme-neutral chevron so no native OS arrow leaks. */
+select.lumi-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 100%;
+  padding: var(--lumi-sys-spacing--s, 8px) 40px var(--lumi-sys-spacing--s, 8px)
+    var(--lumi-sys-spacing--m, 12px);
+  border: 1px solid var(--stroke-default);
+  border-radius: var(--r-full, 999px);
+  background-color: var(--surface);
+  color: var(--on-surface);
+  font-family: var(--ff-sans, 'Google Sans Flex', sans-serif);
+  font-size: 15px;
+  line-height: 20px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2380868b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px;
+}
+select.lumi-select:focus-visible {
+  outline: 2px solid var(--lumi-sys-color--accent-fixed, #3186ff);
+  outline-offset: 2px;
+}
+
+/* Toggle / filter chip. Models frequently emit `<button class="lumi-chip">`
+   (or `.lumi-chip-btn`, `.lumi-filter-btn`, `[class^="lumi-chip-"]`, with
+   `.is-active`/`.active`/`.is-selected`) for toggle pills; without a
+   canonical rule these fall back to native (retro) browser button chrome.
+   Theme-aware via runtime tokens so it is correct in light and dark. */
+.lumi-chip,
+[class^="lumi-chip"],
+[class*=" lumi-chip"],
+[class^="lumi-pill"],
+[class*=" lumi-pill"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lumi-sys-spacing--s, 8px);
+  min-height: 32px;
+  padding: 0 16px;
+  font-family: var(--ff-sans, 'Google Sans Flex', 'Google Sans', sans-serif);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--lumi-sys-color--on-surface-default, #1f1f1f);
+  background: var(--lumi-sys-color--surface-dim, #f2f0f0);
+  border: 1px solid transparent;
+  border-radius: var(--lumi-sys-shape--full, 999px);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.lumi-chip:hover,
+[class^="lumi-chip"]:hover,
+[class*=" lumi-chip"]:hover,
+[class^="lumi-pill"]:hover,
+[class*=" lumi-pill"]:hover {
+  background: var(--lumi-sys-color--surface-container-high, #e6e6e6);
+}
+.lumi-chip.is-active,
+.lumi-chip.active,
+.lumi-chip.is-selected,
+.lumi-chip.selected,
+.lumi-chip[aria-pressed="true"],
+.lumi-chip[aria-selected="true"],
+[class^="lumi-chip"].is-active,
+[class^="lumi-chip"].active,
+[class^="lumi-chip"].is-selected,
+[class^="lumi-chip"].selected,
+[class^="lumi-chip"][aria-pressed="true"],
+[class^="lumi-chip"][aria-selected="true"],
+[class*=" lumi-chip"].is-active,
+[class*=" lumi-chip"].active,
+[class*=" lumi-chip"].is-selected,
+[class*=" lumi-chip"].selected,
+[class^="lumi-pill"].is-active,
+[class^="lumi-pill"].active,
+[class*=" lumi-pill"].is-active,
+[class*=" lumi-pill"].active {
+  color: var(--lumi-sys-color--accent-fixed, #3186ff);
+  background: var(--lumi-sys-color--accent-container, rgba(49, 134, 255, 0.14));
+  border-color: transparent;
+  font-weight: 600;
+}
+.lumi-chip:focus-visible,
+[class^="lumi-chip"]:focus-visible,
+[class*=" lumi-chip"]:focus-visible,
+[class^="lumi-pill"]:focus-visible,
+[class*=" lumi-pill"]:focus-visible {
+  outline: 2px solid var(--lumi-sys-color--accent-fixed, #3186ff);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+ * DIAGRAM GUARD — SVG <text> is fill-only.
+ *   An inherited group stroke (e.g. `.node:hover { stroke }` on a <g>)
+ *   otherwise cascades into child <text>, thickening glyph outlines
+ *   (fake-bold) and recoloring the label. Highlight strokes belong on
+ *   shapes (rect/path); text never paints a stroke.
+ * ============================================================ */
+svg text { stroke: none; paint-order: fill; }
+</style><style id="lumi-alias-bridge">/*
+ * Legacy-alias bridge for Rich Pages interactive islands.
+ *
+ * The Rich Pages system instruction tells the model to colour islands with a
+ * 15-name alias vocabulary (--text-primary, --bg, --border, ...), each written
+ * as `var(--name, #hex)` with a mandated readable fallback. The Luminous
+ * runtime defines only two of those names (--accent, --accent-container), so
+ * injecting the runtime alone would leave every other alias resolving to its
+ * hardcoded hex -- no theming, and a widget that is half Luminous and half
+ * hardcoded.
+ *
+ * This maps the remaining legacy aliases onto Luminous tokens so existing
+ * island output themes correctly with no system-instruction change. It stays
+ * useful after the SI moves the model onto canonical Luminous names, because
+ * older conversations replay through the same renderer.
+ *
+ * Loaded after the Luminous runtime, which defines the right-hand sides.
+ * See go/rich-pages-design.
+ */
+:root {
+  /* Text. Luminous has no third text tier; --text-tertiary shares the variant
+     tone rather than inventing an unthemed value. */
+  --text-primary: var(--on-surface);
+  --text-secondary: var(--on-surface-variant);
+  --text-tertiary: var(--on-surface-variant);
+
+  /* Surfaces. */
+  --bg: var(--surface);
+  --bg-card: var(--surface-container);
+
+  /* Lines. --grid is chart gridlines, which want the same hairline as a
+     border in this palette. */
+  --border: var(--outline);
+  --grid: var(--outline);
+
+  /* Status. */
+  --success: var(--positive);
+  --success-container: var(--positive-container);
+  --danger: var(--error);
+  --danger-container: var(--error-container);
+
+  /*
+   * --warning / --warning-container are deliberately NOT mapped: Luminous
+   * defines no warning role, and borrowing --error would render a caution as
+   * an error. They keep falling through to the SI-mandated fallback hex, which
+   * that instruction already requires to be legible on both light and dark
+   * backgrounds. Map them here if Luminous gains a warning token.
+   */
+}
+
+/*
+ * --accent is the one name both vocabularies define and disagree on. The
+ * system instruction uses it to colour values, emphasis and chart strokes, so
+ * it has to be legible ON a surface. Luminous uses it for a surface tint:
+ * #9dd2ff in light, #1f3b9b in dark. Inheriting the runtime's value therefore
+ * makes accented text and SVG strokes *less* readable than the hardcoded
+ * fallback they replace -- pale blue on white, dark navy on near-black.
+ *
+ * Re-point it at --primary, the legible theme-aware accent (#3186ff light,
+ * #9dd2ff dark). --accent-container is deliberately left inherited: there the
+ * two vocabularies agree, both meaning a tinted container background.
+ *
+ * Repeated across the runtime's own theme selectors because those outrank a
+ * bare :root. --primary already flips by theme, so the declaration is
+ * identical in each. Keep in sync with the dark blocks of luminous.css.
+ */
+:root,
+:root[data-theme='dark'],
+body.dark-mode,
+:root[data-theme='dark'] body {
+  --accent: var(--primary);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --accent: var(--primary);
+  }
+}
+</style><web-component>
+
+
+
+<title>Smart Zone | Online Store</title>
+<script></script>
+
+
+
+
+<!-- Navbar -->
+<div class="navbar">
+  <h1 onclick="goToShop()">🛒 Smart Zone Store</h1>
+  <div class="nav-menu">
+    <button class="cart-btn" onclick="openCart()">🛍️ Cart (<span id="cartCount">0</span>)</button>
+    <button class="admin-login-btn" onclick="document.getElementById(&#39;loginModal&#39;).style.display=&#39;flex&#39;">Admin</button>
   </div>
 </div>
 
-<div id="landingScreen">
-  <h1 style="color: var(--deep-green); margin-bottom: 10px; font-family: 'Inter', sans-serif; font-size: 28px; text-align:center;">West Bengal Agri Stack</h1>
-  <p style="color: #4b6b58; margin-bottom: 30px; font-weight: 500; text-align:center;">Farmer ID Card Generation Portal</p>
-  <button class="start-btn" onclick="startApp()">🌾 Generate Your Farmer ID</button>
+<!-- Shop Front -->
+<div class="container" id="shopFront">
+  <div class="section-title">Latest Products</div>
+  <div id="loadingProducts" style="text-align:center; padding:50px; font-weight:bold; color:#64748b;">Loading products... ⏳</div>
+  <div class="product-grid" id="productGrid">
+    <!-- Products will be injected here via JS -->
+  </div>
 </div>
 
-<div id="customContextMenu"><div class="context-item" onclick="pasteFromContextMenu(event)">📋 Paste Photo</div></div>
-<canvas id="exportCanvas" style="display:none;"></canvas>
+<!-- Admin Dashboard -->
+<div class="container" id="adminDashboard">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+    <h2 style="color:var(--primary); margin:0;">Admin Panel</h2>
+    <button class="btn" style="width:auto; padding:8px 15px; background:#ef4444;" onclick="logoutAdmin()">Exit Admin</button>
+  </div>
+  
+  <div class="admin-tabs">
+    <div class="admin-tab active" onclick="switchTab(&#39;ordersTab&#39;, this)">📦 Recent Orders</div>
+    <div class="admin-tab" onclick="switchTab(&#39;addProductTab&#39;, this)">➕ Add Product</div>
+  </div>
 
+  <!-- Orders Tab -->
+  <div id="ordersTab" class="tab-content active">
+    <div style="background:#fff; padding:20px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.05);">
+      <h3>Recent Customer Orders</h3>
+      <button class="btn" style="width:auto; background:#10b981; margin-bottom:15px;" onclick="loadOrders()">🔄 Refresh Orders</button>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Customer Details</th><th>Products</th><th>Amount</th><th>Status</th></tr></thead>
+          <tbody id="ordersTableBody"><tr><td colspan="5" style="text-align:center;">Loading orders...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Product Tab -->
+  <div id="addProductTab" class="tab-content">
+    <div style="background:#fff; padding:20px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.05); max-width:500px; margin:0 auto;">
+      <h3>Upload New Product</h3>
+      <div class="form-group">
+        <label>Product Name</label>
+        <input type="text" id="newProductName" placeholder="e.g. Smart Watch" />
+      </div>
+      <div class="form-group">
+        <label>Price (₹)</label>
+        <input type="number" id="newProductPrice" placeholder="e.g. 1500" />
+      </div>
+      <div class="form-group">
+        <label>Product Image</label>
+        <input type="file" id="newProductImage" style="border: 1px dashed #2563eb; padding: 20px; background: #eff6ff;" />
+      </div>
+      <button class="btn" id="uploadProductBtn" onclick="uploadProduct()">Upload to Store</button>
+      <p id="uploadMsg" style="text-align:center; font-weight:bold; margin-top:10px;"></p>
+    </div>
+  </div>
+</div>
+
+<!-- Cart Modal -->
+<div id="cartModal" class="modal-overlay">
+  <div class="modal-content">
+    <h2 style="margin-top:0; color:var(--primary);">Your Shopping Cart</h2>
+    <div id="cartItemsList" style="margin-bottom: 20px; max-height: 250px; overflow-y:auto;">
+      <!-- Cart items injected here -->
+    </div>
+    <div class="cart-total" id="cartTotalDisplay">Total: ₹0</div>
+    <button class="btn" style="margin-top:20px;" onclick="proceedToCheckout()">Proceed to Checkout ➔</button>
+    <button class="btn btn-cancel" onclick="document.getElementById(&#39;cartModal&#39;).style.display=&#39;none&#39;">Continue Shopping</button>
+  </div>
+</div>
+
+<!-- Checkout/Customer Details Modal -->
+<div id="checkoutModal" class="modal-overlay">
+  <div class="modal-content">
+    <h2 style="margin-top:0; color:var(--primary);">Delivery Details</h2>
+    <div class="form-group"><label>Full Name</label><input type="text" id="c_name" /></div>
+    <div class="form-group"><label>Mobile Number</label><input type="tel" id="c_phone" /></div>
+    <div class="form-group"><label>Full Delivery Address</label><textarea id="c_address" rows="3"></textarea></div>
+    <div class="form-group"><label>Pincode</label><input type="tel" id="c_pincode" /></div>
+    
+    <button class="btn" id="payBtn" onclick="initiateRazorpayPayment()">Pay ₹<span id="payAmountBtn">0</span> securely</button>
+    <button class="btn btn-cancel" onclick="document.getElementById(&#39;checkoutModal&#39;).style.display=&#39;none&#39;">Cancel</button>
+    <p id="paymentMsg" style="text-align:center; font-weight:bold; margin-top:10px;"></p>
+  </div>
+</div>
+
+<!-- Admin Login Modal -->
 <div id="loginModal" class="modal-overlay">
-  <div class="modal-content auth-modal">
-    <h3 style="margin-top:0; color:var(--deep-green);">Admin Login</h3>
-    <input type="password" id="adminPwdInput" placeholder="Enter Password" onkeypress="if(event.key === 'Enter') verifyAdminLogin()">
-    <div style="display: flex; gap: 10px;">
-      <button class="btn btn-cancel" onclick="document.getElementById('loginModal').style.display='none'">Cancel</button>
-      <button class="btn" id="loginSubmitBtn" onclick="verifyAdminLogin()">Login</button>
-    </div>
-    <p id="loginError" style="color:var(--error); font-size:12px; margin-top:10px; display:none;">Incorrect Password!</p>
-  </div>
-</div>
-
-<div id="downloadModal" class="modal-overlay">
-  <div class="modal-content" style="width: 350px;">
-    <h3 style="color: var(--deep-green); margin-top: 0;">⬇️ Download ID Card</h3>
-    <p style="font-size: 13px; color: #555;">Choose your preferred file format:</p>
-    <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
-      <button class="btn" onclick="downloadJPG()" style="background: #e67e22; font-size: 13px;">🖼️ JPG Format</button>
-      <button class="btn" onclick="downloadPDF()" style="background: #c0392b; font-size: 13px;">📄 PDF (A4 Size)</button>
-    </div>
-    <button class="btn btn-cancel" style="margin-top: 15px; width: 100%; font-size: 13px;" onclick="document.getElementById('downloadModal').style.display='none'">Close</button>
-  </div>
-</div>
-
-<div class="wrap" id="mainApp">
-  <div class="sidebar">
-    <div class="header-flex">
-      <h2 id="modeTitle">Fill Farmer Details</h2>
-      <div style="display:flex; gap: 8px; flex-wrap: wrap;">
-        <button class="admin-btn" style="background:#eaf7ee; border: 1px solid var(--leaf-green); color:var(--deep-green);" onclick="resetForm()">🔄 Replace & New</button>
-        <button class="admin-btn" style="background:#f1f5f9; border: 1px solid #cbd5e1;" onclick="document.getElementById('loginModal').style.display='flex'" id="adminBtn">⚙️ Admin Portal</button>
-        <button class="admin-btn" style="display:none; background:#ef4444; border: 1px solid #dc2626; color: #fff;" onclick="closeAdmin()" id="backBtn">❌ Exit Admin</button>
-      </div>
-    </div>
-
-    <div class="admin-section" id="adminMode">
-      <div class="admin-tabs">
-        <div class="admin-tab active" onclick="switchAdminTab('formContainer', this)">📝 Fill Form</div>
-        <div class="admin-tab" onclick="switchAdminTab('dashboardTab', this)">📊 Dashboard</div>
-        <div class="admin-tab" onclick="switchAdminTab('paymentAdminTab', this)">💳 Transactions</div>
-        <div class="admin-tab" onclick="switchAdminTab('settingsTab', this)">📐 Settings</div>
-      </div>
-      
-      <div id="dashboardTab" class="tab-content">
-         <div class="controls-box" style="text-align:center;">
-           <h3 style="color:#f8fafc; margin-top:0; font-size: 18px; font-weight: 800;">Portal Generation Statistics</h3>
-           <div class="stat-grid">
-             <div class="stat-card stat-total"><div class="stat-number" id="totalCardsCounter">...</div><div class="stat-label">Total Gen</div></div>
-             <div class="stat-card stat-today"><div class="stat-number" id="todayCardsCounter">...</div><div class="stat-label">Today's Gen</div></div>
-             <div class="stat-card stat-admin"><div class="stat-number" id="adminCardsCounter">...</div><div class="stat-label">By Admin</div></div>
-             <div class="stat-card stat-customer"><div class="stat-number" id="custCardsCounter">...</div><div class="stat-label">By Customer</div></div>
-             <div class="stat-card stat-revenue" style="grid-column: 1 / -1; display: flex; justify-content: center; align-items: center; gap: 20px;">
-               <div>
-                  <div class="stat-number">₹<span id="revAmount">***</span><span onclick="toggleRevenue()" style="cursor:pointer; font-size:20px; opacity:0.8; margin-left:10px;">👁️</span></div>
-                  <div class="stat-label">Total Revenue Generated</div>
-               </div>
-             </div>
-           </div>
-           <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
-              <button class="btn" style="width: auto; padding: 10px 25px; font-size: 14px; font-weight: 700; background: #3b82f6; border-radius: 8px;" onclick="loadAdminData()">🔄 Refresh Data</button>
-           </div>
-         </div>
-      </div>
-
-      <div id="paymentAdminTab" class="tab-content">
-         <div class="controls-box">
-           <h3 style="margin-top:0; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">💰 Set Card Generation Fee</h3>
-           <div style="display:flex; gap:10px; align-items:center;">
-              <span style="font-size:20px; font-weight:bold; color:#cbd5e1;">₹</span>
-              <input type="number" id="adminFeeInput" style="padding:10px; width:100px; border-radius:8px; border:2px solid #334155; background:#0f172a; color:#fff; font-size:16px; font-weight:bold; text-align:center;">
-              <button class="btn" onclick="saveAdminFee()" style="width:auto; padding:10px 25px; background: #8b5cf6;">Save Amount</button>
-           </div>
-           <p id="feeUpdateMsg" style="font-size:13px; font-weight:bold; margin-top:8px;"></p>
-         </div>
-
-         <div class="controls-box" style="margin-top:20px;">
-           <div class="control-group-title">
-               🧾 Recent Transactions
-               <input type="text" id="searchTxn" class="txn-search" placeholder="Search by Farmer ID or Txn ID..." onkeyup="filterTransactions()" style="width: 200px; margin: 0; padding: 6px;">
-           </div>
-           <div style="overflow-x:auto; max-height:300px;">
-              <table class="txn-table" id="txnTable">
-                <thead><tr><th>Date & Time</th><th>Farmer ID</th><th>Txn ID</th><th>Amount</th><th>Status</th></tr></thead>
-                <tbody id="txnTableBody"><tr><td colspan="5" style="text-align:center;">Loading data...</td></tr></tbody>
-              </table>
-           </div>
-         </div>
-      </div>
-
-      <div id="settingsTab" class="tab-content">
-        <div class="controls-box" style="margin-bottom: 20px;">
-          <div class="control-group-title">🔒 Security Settings</div>
-          <div style="display:flex; flex-direction:column; gap:10px;">
-            <input type="password" id="oldPwd" placeholder="Current Password" style="padding:10px; border:1px solid #334155; background:#0f172a; color:#fff; border-radius:8px;">
-            <input type="password" id="newPwd" placeholder="New Password" style="padding:10px; border:1px solid #334155; background:#0f172a; color:#fff; border-radius:8px;">
-            <button class="btn" style="padding:10px; font-size:14px; font-weight:700; background:#475569; border-radius:8px;" onclick="changePassword()">Update Password</button>
-            <p id="pwdMsg" style="font-size:12px; margin:0; font-weight:600;"></p>
-          </div>
-        </div>
-
-        <div class="controls-box">
-          <div class="control-group-title">📐 Global Layout Adjustments (Saves for all devices)</div>
-          <div class="control-row" style="margin-bottom:15px;">
-              <div class="control-group-sm" style="border-color: #3b82f6;"><label>Front Height</label><input type="number" id="frontCardH" value="971" oninput="updateManualPreview()"></div>
-              <div class="control-group-sm" style="border-color: #3b82f6;"><label>Back Height</label><input type="number" id="backCardH" value="980" oninput="updateManualPreview()"></div>
-          </div>
-          <div class="control-group-title" style="border:none; margin-top:20px;">📝 Farmer Data List (Text block)</div>
-          <div class="control-row">
-              <div class="control-group-sm"><label>X (Left-Right)</label><input type="number" id="valX" value="700" oninput="updateManualPreview()"></div>
-              <div class="control-group-sm"><label>Y (Up-Down)</label><input type="number" id="valY" value="335" oninput="updateManualPreview()"></div>
-          </div>
-          <div class="control-row">
-              <div class="control-group-sm"><label>Font Size</label><input type="number" id="listFontSize" value="33" oninput="updateManualPreview()"></div>
-              <div class="control-group-sm"><label>Row Gap</label><input type="number" id="valGap" value="42" oninput="updateManualPreview()"></div>
-          </div>
-          <div class="control-row">
-              <div class="control-group-sm" style="grid-column: span 2;"><label>Font Weight (Boldness)</label><input type="number" id="fontWeight" value="700" step="100" min="400" max="900" style="width: 80px;" oninput="updateManualPreview()"></div>
-          </div>
-          <div class="control-group-title" style="border:none; margin-top:15px;">🟩 Farmer ID (Green Box)</div>
-          <div class="control-row">
-              <div class="control-group-sm"><label>X Position</label><input type="number" id="idX" value="782" oninput="updateManualPreview()"></div>
-              <div class="control-group-sm"><label>Y Position</label><input type="number" id="idY" value="208" oninput="updateManualPreview()"></div>
-          </div>
-          <div class="control-row">
-              <div class="control-group-sm"><label>Font Size</label><input type="number" id="idFontSize" value="40" oninput="updateManualPreview()"></div>
-          </div>
-          <div class="control-group-title" style="border:none; margin-top:15px;">📸 Photo Dimensions</div>
-          <div class="control-row">
-              <div class="control-group-sm"><label>X Position</label><input type="number" id="photoX" value="57" oninput="updateManualPreview()"></div>
-              <div class="control-group-sm"><label>Y Position</label><input type="number" id="photoY" value="234" oninput="updateManualPreview()"></div>
-          </div>
-          <div class="control-row">
-              <div class="control-group-sm"><label>Width</label><input type="number" id="photoW" value="281" oninput="updateManualPreview()"></div>
-              <div class="control-group-sm"><label>Height</label><input type="number" id="photoH" value="325" oninput="updateManualPreview()"></div>
-          </div>
-          <div class="control-group-title" style="border:none; margin-top:15px;">🗣 Name underneath Photo</div>
-          <div class="control-row">
-              <div class="control-group-sm"><label>Y (English)</label><input type="number" id="nameY" value="600" oninput="updateManualPreview()"></div>
-              <div class="control-group-sm"><label>Y (Bangla)</label><input type="number" id="nameBnY" value="650" oninput="updateManualPreview()"></div>
-          </div>
-          <div class="control-row">
-              <div class="control-group-sm"><label>Font (Eng)</label><input type="number" id="nameFontSize" value="36" oninput="updateManualPreview()"></div>
-              <div class="control-group-sm"><label>Font (Bangla)</label><input type="number" id="nameBnFontSize" value="35" oninput="updateManualPreview()"></div>
-          </div>
-          <div class="control-group-title" style="border:none; margin-top:15px;">🔳 QR Code Position</div>
-          <div class="control-row">
-              <div class="control-group-sm"><label>X Position</label><input type="number" id="qrX" value="1300" oninput="updateManualPreview()"></div>
-              <div class="control-group-sm"><label>Y Position</label><input type="number" id="qrY" value="230" oninput="updateManualPreview()"></div>
-          </div>
-          <div class="control-row">
-              <div class="control-group-sm"><label>QR Size</label><input type="number" id="qrSize" value="221" oninput="updateManualPreview()"></div>
-          </div>
-          <button id="saveSettingsBtn" class="btn" style="background: linear-gradient(135deg, #2563eb, #1d4ed8); margin-top:20px; font-size: 14px; border-radius: 8px; font-weight: 700; padding: 12px;" onclick="saveLayoutSettings()">💾 Save Coordinates (Global)</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- MAIN FORM -->
-    <div id="formContainer" class="tab-content active" style="display:block;">
-      <div class="photo-upload-box" id="photoBox">
-        <div id="boxContentWrapper">
-          <div style="font-size: 13px; font-weight: 600; color: var(--deep-green);">👤 Upload Farmer Photo <span class="req">*</span></div>
-          <small style="display: block; font-size: 11px; font-weight: 500; color: #555; margin-top:3px;">(Passport Size / ID Card Photo)</small>
-          <div class="photo-actions" id="dynamicPhotoActions"></div>
-        </div>
-        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="loadManualPhoto(event)">
-        <input type="file" id="galleryInput" accept="image/*" style="display:none;" onchange="loadManualPhoto(event)">
-      </div>
-
-      <div class="form-grid">
-        <div class="form-group">
-           <label>Farmer ID (11 chars) <span class="req">*</span></label>
-           <input type="text" id="m_farmerId" oninput="this.value = this.value.replace(/[^0-9A-Za-z]/g, '').toUpperCase().substring(0,11); handleInput(this); checkAutoFill(this.value);" maxlength="11">
-        </div>
-        <div class="form-group"><label>Enrollment No. (21 digits) <span class="req">*</span></label><input type="text" id="m_enrollment" oninput="formatEnrollment(this); handleInput(this)" placeholder="XX_XXX_XXXX_XXXXXX_XXXXXX" maxlength="25"></div>
-        <div class="form-group"><label>Farmer Name (English) <span class="req">*</span></label><input type="text" id="m_name" oninput="this.value = this.value.toUpperCase(); handleInput(this)"></div>
-        <div class="form-group"><label>Farmer Name (Local Language)</label><input type="text" id="m_nameBn" oninput="handleInput(this)"></div>
-        <div class="form-group"><label>Father / Husband / Guardian <span class="req">*</span></label><input type="text" id="m_fatherName" oninput="handleTitleCase(this)"></div>
-        <div class="form-group">
-          <label>Date of Birth <span class="req">*</span></label>
-          <div style="position: relative; display: flex; align-items: center; width: 100%;">
-            <input type="tel" inputmode="numeric" id="m_dob" oninput="this.value = this.value.replace(/[^0-9]/g, ''); formatDOB(this); handleInput(this)" placeholder="DD-MM-YYYY" maxlength="10" style="width: 100%; padding-right: 30px;">
-            <div style="position: absolute; right: 2px; width: 28px; height: 100%; display: flex; align-items: center; justify-content: center;">
-              <input type="date" onchange="syncDate(this.value)" tabindex="-1" style="position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer; padding:0; border:none;">
-              <span style="pointer-events: none; font-size: 16px;">📅</span>
-            </div>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Gender <span class="req">*</span></label>
-          <select id="m_gender" onchange="handleInput(this)"><option value="">Select Gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select>
-        </div>
-        <div class="form-group"><label>Mobile Number (10 digits) <span class="req">*</span></label><input type="tel" inputmode="numeric" id="m_mobile" oninput="this.value = this.value.replace(/[^0-9]/g, '').substring(0,10); handleInput(this)" maxlength="10"></div>
-        <div class="form-group"><label>Aadhaar Number (12 digits) <span class="req">*</span></label><input type="tel" inputmode="numeric" id="m_aadhaar" oninput="this.value = this.value.replace(/[^0-9]/g, ''); formatAadhaar(this); handleInput(this)" placeholder="XXXX-XXXX-XXXX" maxlength="14"></div>
-        
-        <div class="form-group">
-          <label>District <span class="req">*</span></label>
-          <select id="m_district" onchange="loadSubDistricts(); handleInput(this)"><option value="">Loading Data...</option></select>
-        </div>
-        <div class="form-group">
-          <label>Sub-District <span class="req">*</span></label>
-          <select id="m_subDistrict" onchange="loadVillages(); handleInput(this)" disabled><option value="">Select District First</option></select>
-        </div>
-        <div class="form-group">
-          <label>Village <span class="req">*</span></label>
-          <select id="m_village" onchange="handleInput(this)" disabled><option value="">Select Sub-District First</option></select>
-        </div>
-        <div class="form-group"><label>Pin Code (6 digits) <span class="req">*</span></label><input type="tel" inputmode="numeric" id="m_pincode" oninput="this.value = this.value.replace(/[^0-9]/g, '').substring(0,6); handleInput(this)" maxlength="6"></div>
-      </div>
-      <p id="validationMsg" style="font-size:13px; color:#555; font-weight:600; text-align:center; margin-bottom:10px;">📝 Please fill all mandatory fields correctly.</p>
-      
-      <!-- DIRECT PAYMENT NEXT BUTTON -->
-      <button class="btn" id="generateSingleBtn" onclick="handleNextClick()">Next</button>
-    </div>
-  </div>
-
-  <div class="preview-area" id="previewContainer">
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #d7e6da; padding-bottom: 10px; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
-      <h2 id="previewTitle" style="margin:0;">Live Preview (Front Side)</h2>
-      <div class="zoom-controls" style="margin: 0;">
-        <button class="zoom-btn flip-btn" id="flipBtn" onclick="toggleCardSide()">🔄 Show Back Side</button>
-        <button class="zoom-btn" onclick="zoomCanvas(10)">🔍 + Zoom In</button>
-        <button class="zoom-btn" onclick="zoomCanvas(-10)">🔍 - Zoom Out</button>
-      </div>
-    </div>
-    <div class="canvas-wrapper" style="position: relative;">
-      <div id="loadingOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: var(--leaf-green); z-index: 10;">⏳ Loading your card preview...</div>
-      <canvas id="previewCanvas"></canvas>
-    </div>
-  </div>
-</div>
-
-<div id="cropModal" class="modal-overlay">
-  <div class="modal-content" style="width: 450px;">
-    <h3 style="margin-top:0; color:var(--deep-green); font-size:16px;">Crop Face</h3>
-    <div class="crop-container"><img id="imageToCrop" src=""></div>
-    <div class="slider-container">
-      <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:8px;">
-        <label style="margin:0;">Rotate Image (°)</label>
-        <div style="display:flex; gap:5px;">
-          <button class="btn" style="background:#4b6b58; padding:4px 8px; font-size:12px; width:auto;" onclick="rotateImageBy(-90)">↺ Left</button>
-          <button class="btn" style="background:#4b6b58; padding:4px 8px; font-size:12px; width:auto;" onclick="rotateImageBy(90)">↻ Right</button>
-        </div>
-      </div>
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <input type="range" id="rotateSlider" min="-180" max="180" value="0" step="1" oninput="adjustRotation(this.value)">
-        <input type="number" id="rotValueInput" value="0" style="width: 65px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-weight: bold;" oninput="adjustRotation(this.value)">
-      </div>
-    </div>
-    <div class="crop-actions">
-      <button class="btn btn-cancel" onclick="closeCropper()">Cancel</button>
-      <button class="btn" onclick="saveCroppedImage()">✂️ Crop & Save Photo</button>
-    </div>
+  <div class="modal-content" style="max-width:300px;">
+    <h3 style="margin-top:0;">Admin Login</h3>
+    <input type="password" id="adminPwd" placeholder="Password" style="width:100%; padding:10px; margin-bottom:15px;" />
+    <button class="btn" onclick="verifyAdmin()">Login</button>
+    <button class="btn btn-cancel" onclick="document.getElementById(&#39;loginModal&#39;).style.display=&#39;none&#39;">Close</button>
   </div>
 </div>
 
 <script>
-let currentMode = 'manual'; 
-let hasSavedThisSession = false; 
+let products = [];
+let cart = [];
 
-// Server-verified admin session token. Set only after adminLogin() succeeds server-side.
-// This is what unlocks admin-only google.script.run calls — never trust the UI state alone.
-let adminSessionToken = null;
+// Initialize Store
+document.addEventListener("DOMContentLoaded", () => {
+    loadProducts();
+});
 
 // ==========================================
-// ADMIN DASHBOARD & REVENUE LOGIC
+// STORE FRONT LOGIC
 // ==========================================
-let actualRevenue = 0;
-let isRevHidden = true;
+function loadProducts() {
+    if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(function(data) {
+            products = data;
+            renderProducts();
+        }).getProducts();
+    } else {
+        document.getElementById('loadingProducts').innerText = "Backend not connected!";
+    }
+}
 
-function loadAdminData() {
-  if (typeof google === 'undefined' || !adminSessionToken) return;
-
-  google.script.run.withSuccessHandler(function(counts) {
-    document.getElementById('totalCardsCounter').innerText = counts.total || 0;
-    document.getElementById('todayCardsCounter').innerText = counts.today || 0;
-    document.getElementById('adminCardsCounter').innerText = counts.admin || 0;
-    document.getElementById('custCardsCounter').innerText = counts.customer || 0;
-  }).withFailureHandler(handleAdminAuthError).getActualCardCount(adminSessionToken);
-
-  google.script.run.withSuccessHandler(function(fee) {
-    document.getElementById('adminFeeInput').value = fee;
-  }).getFeeAmount();
-
-  google.script.run.withSuccessHandler(function(res) {
-    actualRevenue = res.revenue;
-    if(!isRevHidden) document.getElementById('revAmount').innerText = actualRevenue;
+function renderProducts() {
+    const grid = document.getElementById('productGrid');
+    document.getElementById('loadingProducts').style.display = 'none';
+    grid.innerHTML = '';
     
-    let tbody = document.getElementById('txnTableBody');
-    tbody.innerHTML = "";
-    if(res.history.length === 0) {
-       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No transactions found</td></tr>';
-    } else {
-       res.history.forEach(tx => {
-         let badge = tx.status === "SUCCESS" ? 'badge-success' : 'badge-fail';
-         tbody.innerHTML += `<tr>
-           <td>${tx.date}</td>
-           <td style="font-weight:bold; color: #fff;">${tx.farmerId}</td>
-           <td style="font-size:11px;">${tx.txnId}</td>
-           <td>₹${tx.amount}</td>
-           <td><span class="badge ${badge}">${tx.status}</span></td>
-         </tr>`;
-       });
+    if(products.length === 0) {
+        grid.innerHTML = '<p style="grid-column:1/-1; text-align:center;">No products available right now.</p>';
+        return;
     }
-  }).withFailureHandler(handleAdminAuthError).getAdminPaymentData(adminSessionToken);
+
+    products.forEach((p, index) => {
+        grid.innerHTML += `
+        <div class="product-card">
+            <img src="${p.image}" class="product-img" alt="Product">
+            <div class="product-info">
+                <div>
+                    <h3 class="product-title">${p.name}</h3>
+                    <div class="product-price">₹${p.price}</div>
+                </div>
+                <button class="add-cart-btn" onclick="addToCart(${index})">Add to Cart 🛒</button>
+            </div>
+        </div>`;
+    });
 }
 
-// If a session expires mid-use, kick the user back to a logged-out state cleanly.
-function handleAdminAuthError(err) {
-  console.error(err);
-  if (String(err.message || err).indexOf('UNAUTHORIZED') !== -1) {
-    showCustomAlert("⚠️ Your admin session expired. Please log in again.");
-    closeAdmin();
-  }
-}
-
-function filterTransactions() {
-  let input = document.getElementById("searchTxn").value.toUpperCase();
-  let table = document.getElementById("txnTable");
-  let tr = table.getElementsByTagName("tr");
-
-  for (let i = 1; i < tr.length; i++) {
-    let td1 = tr[i].getElementsByTagName("td")[1]; // Farmer ID
-    let td2 = tr[i].getElementsByTagName("td")[2]; // Txn ID
-    if (td1 || td2) {
-      let txtValue1 = td1.textContent || td1.innerText;
-      let txtValue2 = td2.textContent || td2.innerText;
-      if (txtValue1.toUpperCase().indexOf(input) > -1 || txtValue2.toUpperCase().indexOf(input) > -1) {
-        tr[i].style.display = "";
-      } else {
-        tr[i].style.display = "none";
-      }
-    }
-  }
-}
-
-function toggleRevenue() {
-  isRevHidden = !isRevHidden;
-  document.getElementById('revAmount').innerText = isRevHidden ? '***' : actualRevenue;
-}
-
-function saveAdminFee() {
-  let fee = document.getElementById('adminFeeInput').value;
-  let msg = document.getElementById('feeUpdateMsg');
-  if(!fee || fee <= 0) { msg.innerText = "Invalid Amount!"; msg.style.color = "#ef4444"; return; }
-  if (!adminSessionToken) return;
-
-  google.script.run.withSuccessHandler(function(res) {
-    if (res.success) {
-      msg.innerText = "✅ Fee Updated Successfully!";
-      msg.style.color = "#10b981";
-    } else {
-      msg.innerText = "⚠️ " + res.error;
-      msg.style.color = "#ef4444";
-    }
-    setTimeout(()=> msg.innerText="", 3000);
-  }).withFailureHandler(handleAdminAuthError).updateFeeAmount(adminSessionToken, fee);
-}
-
-// ==========================================
-// DIRECT PAYMENT ON "NEXT" CLICK
-// ==========================================
-function handleNextClick() {
-  let isValid = true;
-  let rawAadhaar = document.getElementById('m_aadhaar').value.replace(/[^0-9]/g, '');
-  let rawEnrollment = document.getElementById('m_enrollment').value.replace(/[^A-Za-z0-9]/g, '');
-  
-  let checks = {
-    'm_farmerId': (v) => v.length === 11, 'm_enrollment': (v) => rawEnrollment.length === 21, 'm_dob': (v) => v.length === 10,
-    'm_mobile': (v) => v.length === 10, 'm_aadhaar': (v) => rawAadhaar.length === 12, 'm_pincode': (v) => v.length === 6,
-    'm_name': (v) => v.length > 0, 'm_fatherName': (v) => v.length > 0, 'm_gender': (v) => v.length > 0,
-    'm_district': (v) => v.length > 0, 'm_subDistrict': (v) => v.length > 0, 'm_village': (v) => v.length > 0
-  };
-  
-  for (const [id, validator] of Object.entries(checks)) {
-    let el = document.getElementById(id);
-    if (!validator(el.value)) { el.classList.add('invalid'); isValid = false; } else { el.classList.remove('invalid'); }
-  }
-  let pBox = document.getElementById('photoBox');
-  if (!croppedPhotoImg) { pBox.classList.add('invalid'); isValid = false; }
-
-  const msgElement = document.getElementById('validationMsg');
-  
-  if (!isValid) { 
-    msgElement.innerHTML = "⚠️ Red marked fields have incorrect length or are empty. Photo is mandatory."; 
-    msgElement.style.color = "var(--error)"; 
-  } else { 
+function addToCart(index) {
+    cart.push(products[index]);
+    document.getElementById('cartCount').innerText = cart.length;
     
-    // Data save trigger
-    pushDataToBackend(); 
+    // Tiny animation feedback
+    const btn = document.querySelectorAll('.add-cart-btn')[index];
+    btn.innerText = "Added! ✔️";
+    btn.style.background = "var(--success)";
+    setTimeout(()=> { btn.innerText = "Add to Cart 🛒"; btn.style.background = "var(--primary)"; }, 1500);
+}
 
-    if (currentMode === 'admin') {
-       msgElement.innerHTML = "✅ Processed! Click Download below."; 
-       msgElement.style.color = "var(--success-text)";
-       document.getElementById('downloadModal').style.display = 'flex';
+function openCart() {
+    const list = document.getElementById('cartItemsList');
+    list.innerHTML = '';
+    let total = 0;
+    
+    if(cart.length === 0) {
+        list.innerHTML = '<p style="text-align:center;">Your cart is empty.</p>';
     } else {
-       // DIRECTLY CALL RAZORPAY POPUP
-       initiateRazorpayPayment();
+        cart.forEach((item, i) => {
+            total += parseInt(item.price);
+            list.innerHTML += `
+            <div class="cart-item">
+                <span style="font-weight:600;">${item.name}</span>
+                <span>₹${item.price} <span style="color:red; cursor:pointer; margin-left:10px;" onclick="removeFromCart(${i})">✖</span></span>
+            </div>`;
+        });
     }
-  }
+    document.getElementById('cartTotalDisplay').innerText = `Total: ₹${total}`;
+    document.getElementById('payAmountBtn').innerText = total;
+    document.getElementById('cartModal').style.display = 'flex';
+}
+
+function removeFromCart(index) {
+    cart.splice(index, 1);
+    document.getElementById('cartCount').innerText = cart.length;
+    openCart();
+}
+
+function proceedToCheckout() {
+    if(cart.length === 0) { alert("Cart is empty!"); return; }
+    document.getElementById('cartModal').style.display = 'none';
+    document.getElementById('checkoutModal').style.display = 'flex';
 }
 
 // ==========================================
-// RAZORPAY FRONTEND LOGIC (STANDARD IN-PAGE POPUP)
+// RAZORPAY CHECKOUT LOGIC
 // ==========================================
 function initiateRazorpayPayment() {
-  const msgElement = document.getElementById('validationMsg');
-  const farmerId = document.getElementById('m_farmerId').value;
-  const customerName = document.getElementById('m_name').value;
-  const customerPhone = document.getElementById('m_mobile').value;
-  const generateBtn = document.getElementById('generateSingleBtn');
-  
-  msgElement.innerHTML = "⏳ Opening Secure Payment Gateway..."; 
-  msgElement.style.color = "#3b82f6";
-  generateBtn.innerText = "Processing...";
-  generateBtn.disabled = true;
+    const name = document.getElementById('c_name').value;
+    const phone = document.getElementById('c_phone').value;
+    const address = document.getElementById('c_address').value;
+    const pin = document.getElementById('c_pincode').value;
+    
+    if(!name || phone.length!==10 || !address || !pin) {
+        alert("Please fill all delivery details correctly!"); return;
+    }
 
-  if (typeof google !== 'undefined') {
+    const totalAmount = cart.reduce((sum, item) => sum + parseInt(item.price), 0);
+    const orderItems = cart.map(i => i.name).join(", ");
+    const payBtn = document.getElementById('payBtn');
+    const msg = document.getElementById('paymentMsg');
+    
+    payBtn.innerText = "Connecting to Gateway..."; payBtn.disabled = true;
+
     google.script.run.withSuccessHandler(function(res) {
-      if(res.success) {
-        msgElement.innerHTML = "💳 Please complete the payment on the popup.";
-        
-        var options = {
-            "key": res.key_id, 
-            "amount": res.amount, 
-            "currency": "INR",
-            "name": "West Bengal Agri Stack",
-            "description": "ID Card Generation Fee",
-            "order_id": res.order_id,
-            "handler": function (response) {
-                // Payment Success - Auto Verify
-                msgElement.innerHTML = "⏳ Verifying Payment securely...";
-                msgElement.style.color = "#3b82f6";
-                
-                google.script.run.withSuccessHandler(function(verifyRes) {
-                    if(verifyRes.success) {
-                        msgElement.innerHTML = "✅ Payment Successful! Download your card.";
-                        msgElement.style.color = "green";
-                        
-                        // Direct Download Option
-                        document.getElementById('downloadModal').style.display = 'flex';
-                        
-                        generateBtn.innerText = "Next"; 
-                        generateBtn.disabled = false;
-                        if (currentMode === 'admin') loadAdminData(); 
-                    } else {
-                        msgElement.innerHTML = "⚠️ Payment verification failed! Please click Next to try again.";
-                        msgElement.style.color = "red";
-                        generateBtn.innerText = "Next"; generateBtn.disabled = false;
-                    }
-                }).verifyRazorpaySignature(response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature, farmerId);
-            },
-            "prefill": {
-                "name": customerName,
-                "contact": customerPhone
-            },
-            "theme": {
-                "color": "#3b82f6"
-            },
-            "modal": {
-                "ondismiss": function(){
-                    // User closed the popup manually
-                    msgElement.innerHTML = "⚠️ Payment cancelled or window closed. Click Next to try again.";
-                    msgElement.style.color = "red";
-                    generateBtn.innerText = "Next"; generateBtn.disabled = false;
-                }
-            }
-        };
-        
-        var rzp1 = new Razorpay(options);
-        
-        // Handling failed payment
-        rzp1.on('payment.failed', function (response){
-            msgElement.innerHTML = "⚠️ Payment Failed: " + response.error.description + ". Click Next to try again.";
-            msgElement.style.color = "red";
-            generateBtn.innerText = "Next"; generateBtn.disabled = false;
-        });
-        
-        // Open the Razorpay Popup directly
-        rzp1.open();
-        
-      } else {
-        msgElement.innerHTML = "⚠️ Error connecting to payment gateway: " + res.error; 
-        msgElement.style.color = "red";
-        generateBtn.innerText = "Next"; generateBtn.disabled = false;
-      }
-    }).createRazorpayOrder(farmerId);
-  }
-}
-
-// ==========================================
-// AUTO-FILL & GLOBAL SETTINGS
-// ==========================================
-const settingKeys = ['frontCardH', 'backCardH', 'valX', 'valY', 'listFontSize', 'valGap', 'fontWeight', 'idX', 'idY', 'idFontSize', 'photoX', 'photoY', 'photoW', 'photoH', 'nameY', 'nameBnY', 'nameFontSize', 'nameBnFontSize', 'qrX', 'qrY', 'qrSize'];
-
-function saveLayoutSettings() { 
-  let settings = {};
-  settingKeys.forEach(k => { settings[k] = document.getElementById(k).value; });
-  if (!adminSessionToken) return;
-
-  let btn = document.getElementById('saveSettingsBtn');
-  btn.innerText = "⏳ Saving Globally...";
-
-  google.script.run.withSuccessHandler(function() {
-    btn.innerText = "💾 Save Coordinates (Global)";
-    showCustomAlert("✅ Global layout settings saved successfully! All devices will now use this as default.");
-    updateManualPreview();
-  }).withFailureHandler(function(err) {
-    btn.innerText = "💾 Save Coordinates (Global)";
-    handleAdminAuthError(err);
-  }).saveGlobalSettings(adminSessionToken, settings); 
-}
-
-function loadSavedSettings() { 
-  if (typeof google !== 'undefined' && google.script && google.script.run) {
-    google.script.run.withSuccessHandler(function(serverSettings) {
-      if (serverSettings) {
-        settingKeys.forEach(k => { 
-          if(serverSettings[k]) document.getElementById(k).value = serverSettings[k];
-        });
-        updateManualPreview();
-      }
-    }).getGlobalSettings(); 
-  }
-}
-
-function checkAutoFill(val) {
-  if (val.length === 11) {
-    if (typeof google !== 'undefined') {
-      google.script.run.withSuccessHandler(function(data) {
-        if (data) {
-          document.getElementById('m_enrollment').value = data.enrollment || '';
-          document.getElementById('m_name').value = data.nameEn || '';
-          document.getElementById('m_nameBn').value = data.nameBn || '';
-          document.getElementById('m_fatherName').value = data.fatherName || '';
-          document.getElementById('m_dob').value = data.dob || '';
-          document.getElementById('m_gender').value = data.gender || '';
-          document.getElementById('m_mobile').value = data.mobile || '';
-          document.getElementById('m_aadhaar').value = data.aadhaar || '';
-          document.getElementById('m_pincode').value = data.pincode || '';
-          
-          if (data.district) {
-            let dSel = document.getElementById('m_district');
-            if (![...dSel.options].some(o => o.value === data.district)) dSel.add(new Option(data.district, data.district));
-            dSel.value = data.district; loadSubDistricts();
-          }
-          if (data.subDistrict) {
-            let sdSel = document.getElementById('m_subDistrict');
-            if (![...sdSel.options].some(o => o.value === data.subDistrict)) sdSel.add(new Option(data.subDistrict, data.subDistrict));
-            sdSel.value = data.subDistrict; loadVillages();
-          }
-          if (data.village) {
-            let vSel = document.getElementById('m_village');
-            if (![...vSel.options].some(o => o.value === data.village)) vSel.add(new Option(data.village, data.village));
-            vSel.value = data.village;
-          }
-          
-          if(data.fileId) {
-             google.script.run.withSuccessHandler(function(base64Data) {
-                if(!base64Data.error) {
-                   croppedPhotoImg = new Image();
-                   croppedPhotoImg.onload = () => {
-                      let pBox = document.getElementById('photoBox'); pBox.classList.remove('invalid'); pBox.style.backgroundColor = '#d4edda'; pBox.style.borderColor = '#28a745';
-                      document.getElementById('boxContentWrapper').innerHTML = `<div style="font-size: 16px; font-weight: bold; color: #155724; margin-bottom: 10px;">✅ Photo Fetched Successfully!</div><div class="photo-actions"><button type="button" class="photo-btn" onclick="document.getElementById('galleryInput').click()">📁 Change Photo</button></div>`;
-                      manualPhotoBase64 = base64Data; updateManualPreview(); checkFormSilent();
-                   };
-                   croppedPhotoImg.src = base64Data;
-                }
-             }).getTemplateImage(data.fileId);
-          } else { updateManualPreview(); checkFormSilent(); }
+        if(res.success) {
+            msg.innerText = "Complete payment in popup..."; msg.style.color = "blue";
+            
+            var options = {
+                "key": res.key_id, 
+                "amount": res.amount, 
+                "currency": "INR",
+                "name": "Smart Zone Store",
+                "description": "Purchase Order",
+                "order_id": res.order_id,
+                "handler": function (response) {
+                    msg.innerText = "Verifying Payment...";
+                    
+                    const orderData = { name: name, phone: phone, address: address + " - " + pin, items: orderItems, amount: totalAmount };
+                    
+                    google.script.run.withSuccessHandler(function(vRes) {
+                        if(vRes.success) {
+                            msg.innerText = "✅ Order Placed Successfully!"; msg.style.color = "green";
+                            cart = []; document.getElementById('cartCount').innerText = "0";
+                            setTimeout(() => { document.getElementById('checkoutModal').style.display='none'; alert("Thank you! Your order has been placed."); }, 2000);
+                        }
+                    }).verifyAndSaveOrder(response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature, orderData);
+                },
+                "prefill": { "name": name, "contact": phone },
+                "theme": { "color": "#2563eb" },
+                "modal": { "ondismiss": function(){ msg.innerText = "Payment cancelled."; msg.style.color = "red"; payBtn.innerText = `Pay ₹${totalAmount} securely`; payBtn.disabled = false;} }
+            };
+            var rzp = new Razorpay(options);
+            rzp.open();
+        } else {
+            msg.innerText = "Error: " + res.error; payBtn.disabled = false;
         }
-      }).getFarmerDetails(val);
-    }
-  }
+    }).createEcommerceOrder(totalAmount);
 }
-
-function showCustomAlert(msg) { document.getElementById('customAlertMessage').innerText = msg; document.getElementById('customAlertOverlay').style.display = 'flex'; }
-document.addEventListener('contextmenu', event => { if (currentMode === 'admin') return; if(event.target.closest('#photoBox')) return; event.preventDefault(); });
-document.addEventListener('keydown', (e) => { if (currentMode === 'admin') return; if (e.key === 'PrintScreen') { navigator.clipboard.writeText(''); showCustomAlert("Screenshots are disabled."); } if (e.ctrlKey && (e.key === 'p' || e.key === 's' || e.key === 'c' || e.key === 'u')) { e.preventDefault(); } });
-document.addEventListener('copy', event => { if (currentMode === 'admin') return; event.preventDefault(); });
-
-function startApp() { document.getElementById('landingScreen').style.display = 'none'; document.getElementById('mainApp').style.display = 'flex'; document.body.classList.add('secure-mode'); updateManualPreview(); }
-
-const FRONT_TEMPLATE_ID = '1hAjUiyuQLqhoc4VX9oUyyO0c7rq0-j3Z';
-const BACK_TEMPLATE_ID = '1xUiq6dw3ZLQ2J4-oxBJ5-CkhQ3BEaLLm';
-let frontImg = null; let backImg = null; let manualPhotoBase64 = null; let croppedPhotoImg = null; let cropper = null; let isMobileDevice = false; let showingSide = 'front'; 
-const CARD_W = 1579; const QR_WEBSITE = "wbfr.agristack.gov.in"; 
-
-const formFieldIDs = ['m_farmerId', 'm_enrollment', 'm_name', 'm_nameBn', 'm_fatherName', 'm_dob', 'm_gender', 'm_mobile', 'm_aadhaar', 'm_district', 'm_subDistrict', 'm_village', 'm_pincode'];
-
-let currentZoom = 100;
-function zoomCanvas(amount) { currentZoom += amount; if(currentZoom < 20) currentZoom = 20; if(currentZoom > 300) currentZoom = 300; document.getElementById('previewCanvas').style.width = currentZoom + '%'; }
-function toggleCardSide() { showingSide = (showingSide === 'front') ? 'back' : 'front'; document.getElementById('flipBtn').innerText = showingSide === 'front' ? '🔄 Show Back Side' : '🔄 Show Front Side'; document.getElementById('previewTitle').innerText = showingSide === 'front' ? 'Live Preview (Front Side)' : 'Live Preview (Back Side)'; updateManualPreview(); }
-
-document.addEventListener("DOMContentLoaded", function() {
-  loadSavedSettings();
-  isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768; renderPhotoButtons();
-  let templatesLoaded = 0;
-  function checkTemplatesLoaded() { templatesLoaded++; if(templatesLoaded === 2) { const overlay = document.getElementById('loadingOverlay'); if(overlay) overlay.style.display = 'none'; updateManualPreview(); } }
-  
-  if (typeof google !== 'undefined' && google.script) {
-    google.script.run.withSuccessHandler(function(base64Data) { if(!base64Data.error) { const img = new Image(); img.onload = () => { frontImg = img; checkTemplatesLoaded(); }; img.src = base64Data; } }).getTemplateImage(FRONT_TEMPLATE_ID);
-    google.script.run.withSuccessHandler(function(base64Data) { if(!base64Data.error) { const img = new Image(); img.onload = () => { backImg = img; checkTemplatesLoaded(); }; img.src = base64Data; } }).getTemplateImage(BACK_TEMPLATE_ID);
-  } else {
-    checkTemplatesLoaded(); checkTemplatesLoaded();
-  }
-});
-
-let globalDropdownData = {};
-document.addEventListener("DOMContentLoaded", function() {
-  if (typeof google !== 'undefined' && google.script) {
-    google.script.run.withSuccessHandler(function(data) {
-      globalDropdownData = data; const distSelect = document.getElementById("m_district"); distSelect.innerHTML = '<option value="">Select District</option>';
-      Object.keys(data).sort().forEach(d => distSelect.add(new Option(d, d)));
-    }).getDropdownData();
-  }
-});
-
-function loadSubDistricts() {
-  const dist = document.getElementById("m_district").value; const subDistSelect = document.getElementById("m_subDistrict"); const villageSelect = document.getElementById("m_village");
-  subDistSelect.innerHTML = '<option value="">Select Sub-District</option>'; villageSelect.innerHTML = '<option value="">Select Sub-District First</option>'; subDistSelect.disabled = true; villageSelect.disabled = true;
-  if (dist && globalDropdownData[dist]) { Object.keys(globalDropdownData[dist]).sort().forEach(sd => subDistSelect.add(new Option(sd, sd))); subDistSelect.disabled = false; } updateManualPreview();
-}
-
-function loadVillages() {
-  const dist = document.getElementById("m_district").value; const subDist = document.getElementById("m_subDistrict").value; const villageSelect = document.getElementById("m_village");
-  villageSelect.innerHTML = '<option value="">Select Village</option>'; villageSelect.disabled = true;
-  if (dist && subDist && globalDropdownData[dist][subDist]) { globalDropdownData[dist][subDist].sort().forEach(v => villageSelect.add(new Option(v, v))); villageSelect.disabled = false; } updateManualPreview();
-}
-
-function renderPhotoButtons() {
-  const actionContainer = document.getElementById('dynamicPhotoActions');
-  if (isMobileDevice) { actionContainer.innerHTML = `<button type="button" class="photo-btn" onclick="document.getElementById('cameraInput').click()">📷 Camera</button><button type="button" class="photo-btn" onclick="document.getElementById('galleryInput').click()">🖼️ Gallery</button>`; } 
-  else { actionContainer.innerHTML = `<button type="button" class="photo-btn" onclick="document.getElementById('galleryInput').click()">📁 Browse Photo</button>`; }
-}
-
-function resetForm() {
-  hasSavedThisSession = false; 
-  formFieldIDs.forEach(id => { let el = document.getElementById(id); if(el) { el.value = ''; el.classList.remove('invalid'); } });
-  document.getElementById('m_district').selectedIndex = 0; document.getElementById('m_subDistrict').innerHTML = '<option value="">Select District First</option>'; document.getElementById('m_subDistrict').disabled = true; document.getElementById('m_village').innerHTML = '<option value="">Select Sub-District First</option>'; document.getElementById('m_village').disabled = true;
-  croppedPhotoImg = null; manualPhotoBase64 = null;
-  let pBox = document.getElementById('photoBox'); pBox.style.backgroundColor = '#eaf7ee'; pBox.style.borderColor = 'var(--leaf-green)'; pBox.classList.remove('invalid');
-  document.getElementById('boxContentWrapper').innerHTML = `<div style="font-size: 13px; font-weight: 600; color: var(--deep-green);">👤 Upload Farmer Photo <span class="req">*</span></div><small style="display: block; font-size: 11px; font-weight: 500; color: #555; margin-top:3px;">(Passport Size / ID Card Photo)</small><div class="photo-actions" id="dynamicPhotoActions"></div>`; renderPhotoButtons();
-  const msgElement = document.getElementById('validationMsg'); msgElement.innerHTML = "📝 Please fill all mandatory fields correctly."; msgElement.style.color = "#555";
-  updateManualPreview(); showCustomAlert("✅ Ready for a new card!");
-}
-
-function handleInput(el) { if (el) el.classList.remove('invalid'); updateManualPreview(); checkFormSilent(); }
-function handleTitleCase(input) { let start = input.selectionStart; let end = input.selectionEnd; let words = input.value.split(' '); for (let i = 0; i < words.length; i++) { if(words[i].length > 0) words[i] = words[i].charAt(0).toUpperCase() + words[i].slice(1).toLowerCase(); } input.value = words.join(' '); input.setSelectionRange(start, end); handleInput(input); }
-function syncDate(dateStr) { if(!dateStr) return; const parts = dateStr.split('-'); if(parts.length === 3) { let dobField = document.getElementById('m_dob'); dobField.value = `${parts[2]}-${parts[1]}-${parts[0]}`; handleInput(dobField); } }
-function formatAadhaar(input) { let val = input.value.replace(/\D/g, '').substring(0,12); let match = val.match(/^(\d{1,4})(\d{1,4})?(\d{1,4})?$/); if (match) { let formatted = !match[2] ? match[1] : match[1] + '-' + match[2] + (match[3] ? '-' + match[3] : ''); if(input.value !== formatted) input.value = formatted; } }
-function formatEnrollment(input) { let val = input.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().substring(0, 21); let match = val.match(/^(.{1,2})(.{1,3})?(.{1,4})?(.{1,6})?(.{1,6})?$/); if (match) { let res = match[1]; if (match[2]) res += '_' + match[2]; if (match[3]) res += '_' + match[3]; if (match[4]) res += '_' + match[4]; if (match[5]) res += '_' + match[5]; if(input.value !== res) input.value = res; } }
-function formatDOB(input) { let val = input.value.replace(/\D/g, '').substring(0, 8); let match = val.match(/^(\d{1,2})(\d{1,2})?(\d{1,4})?$/); if (match) { let formatted = !match[2] ? match[1] : match[1] + '-' + match[2] + (match[3] ? '-' + match[3] : ''); if(input.value !== formatted) input.value = formatted; } }
-
-function checkFormSilent() {
-  let isValid = true;
-  let rawAadhaar = document.getElementById('m_aadhaar').value.replace(/[^0-9]/g, '');
-  let rawEnrollment = document.getElementById('m_enrollment').value.replace(/[^A-Za-z0-9]/g, '');
-  if(document.getElementById('m_farmerId').value.length !== 11 || rawEnrollment.length !== 21 || document.getElementById('m_dob').value.length !== 10 || document.getElementById('m_mobile').value.length !== 10 || rawAadhaar.length !== 12 || document.getElementById('m_pincode').value.length !== 6) isValid = false;
-  ['m_name', 'm_fatherName', 'm_gender', 'm_district', 'm_subDistrict', 'm_village'].forEach(id => { let el = document.getElementById(id); if (!el || !el.value) isValid = false; });
-  if (!croppedPhotoImg) isValid = false;
-  const msgElement = document.getElementById('validationMsg');
-  if (isValid) { msgElement.innerHTML = currentMode === 'admin' ? "✅ Process to Download Card" : "✅ All fields verified! Ready for Payment."; msgElement.style.color = "var(--success-text)"; } else { msgElement.innerHTML = "📝 Please fill all mandatory fields correctly."; msgElement.style.color = "#555"; }
-  return isValid;
-}
-
-function generateExportImage(isLivePreview = false) {
-  const exportCanvas = document.getElementById('exportCanvas'); const eCtx = exportCanvas.getContext('2d');
-  
-  let frontCardH = parseInt(document.getElementById('frontCardH').value || 971); 
-  let backCardH = parseInt(document.getElementById('backCardH').value || 980); 
-  let maxH = Math.max(frontCardH, backCardH);
-  const GAP = 40; const PADDING = GAP; exportCanvas.width = (CARD_W * 2) + GAP + (PADDING * 2); exportCanvas.height = maxH + (PADDING * 2);
-  eCtx.fillStyle = '#ffffff'; eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height); eCtx.save(); eCtx.translate(PADDING, PADDING);
-  if (frontImg) eCtx.drawImage(frontImg, 0, 0, CARD_W, frontCardH, 0, 0, CARD_W, frontCardH); else { eCtx.fillStyle = '#f0f0f0'; eCtx.fillRect(0, 0, CARD_W, frontCardH); }
-  if (backImg) eCtx.drawImage(backImg, 0, 0, CARD_W, backCardH, CARD_W + GAP, 0, CARD_W, backCardH); else { eCtx.fillStyle = '#e8e8e8'; eCtx.fillRect(CARD_W + GAP, 0, CARD_W, backCardH); }
-
-  let listFontSize = parseInt(document.getElementById('listFontSize').value || 33); 
-  let idFontSize = parseInt(document.getElementById('idFontSize').value || 40); 
-  let nameFontSize = parseInt(document.getElementById('nameFontSize').value || 36); let nameBnFontSize = parseInt(document.getElementById('nameBnFontSize').value || 35); let fontWeight = document.getElementById('fontWeight').value || "700"; let qrSize = parseInt(document.getElementById('qrSize').value || 221); let photoW = parseInt(document.getElementById('photoW').value || 281); let photoH = parseInt(document.getElementById('photoH').value || 325);
-  eCtx.fillStyle = 'black'; eCtx.font = `${fontWeight} ${listFontSize}px 'Inter', 'Hind Siliguri', sans-serif`; eCtx.textAlign = 'left'; eCtx.textBaseline = 'alphabetic';
-  let startX = parseInt(document.getElementById('valX').value || 700); let startY = parseInt(document.getElementById('valY').value || 335); let gap = parseInt(document.getElementById('valGap').value || 42);
-  
-  let district = document.getElementById('m_district').value || ""; let subDistrict = document.getElementById('m_subDistrict').value || ""; let village = document.getElementById('m_village').value || ""; let pincode = document.getElementById('m_pincode').value || ""; let combinedAddress = village; if(village && pincode) combinedAddress += " - " + pincode; else if (pincode) combinedAddress = pincode;
-  const applyTextMask = (text) => text; 
-  const fields = [ applyTextMask(document.getElementById('m_enrollment').value), applyTextMask(document.getElementById('m_fatherName').value), applyTextMask(document.getElementById('m_dob').value), applyTextMask(document.getElementById('m_gender').value), applyTextMask(document.getElementById('m_mobile').value), applyTextMask(document.getElementById('m_aadhaar').value), applyTextMask(district), applyTextMask(subDistrict), applyTextMask(combinedAddress) ];
-  fields.forEach((val, i) => { if (val) eCtx.fillText(val, startX, startY + (i * gap)); });
-  const farmerId = applyTextMask(document.getElementById('m_farmerId').value);
-  
-  if (farmerId) { 
-    eCtx.font = `${fontWeight} ${idFontSize}px 'Inter', sans-serif`; 
-    let idX = parseInt(document.getElementById('idX').value || 782); 
-    let idY = parseInt(document.getElementById('idY').value || 208); 
-    const maxIdWidth = 400; 
-    eCtx.fillText(farmerId, idX, idY, maxIdWidth); 
-  }
-  
-  let photoX = parseInt(document.getElementById('photoX').value || 57); let photoY = parseInt(document.getElementById('photoY').value || 234); let nameY = parseInt(document.getElementById('nameY').value || 600); let nameBnY = parseInt(document.getElementById('nameBnY').value || 650); let center_x = photoX + (photoW / 2); let max_name_width = photoW + 20; 
-  eCtx.textAlign = 'center'; eCtx.textBaseline = 'middle';
-  const nameEn = applyTextMask(document.getElementById('m_name').value); if (nameEn) { eCtx.font = `${fontWeight} ${nameFontSize}px 'Inter', sans-serif`; eCtx.fillText(nameEn, center_x, nameY, max_name_width); }
-  const nameBn = applyTextMask(document.getElementById('m_nameBn').value); if (nameBn) { eCtx.font = `${fontWeight} ${nameBnFontSize}px 'Hind Siliguri', sans-serif`; eCtx.fillText(nameBn, center_x, nameBnY, max_name_width); }
-  eCtx.textAlign = 'left'; eCtx.textBaseline = 'alphabetic';
-
-  if (croppedPhotoImg) {
-    eCtx.save(); eCtx.beginPath(); if(eCtx.roundRect) { eCtx.roundRect(photoX, photoY, photoW, photoH, 8); } else { eCtx.rect(photoX, photoY, photoW, photoH); } eCtx.clip(); eCtx.drawImage(croppedPhotoImg, photoX, photoY, photoW, photoH);
-    if (isLivePreview) { eCtx.beginPath(); eCtx.moveTo(photoX, photoY); eCtx.lineTo(photoX + photoW, photoY + photoH); eCtx.moveTo(photoX + photoW, photoY); eCtx.lineTo(photoX, photoY + photoH); eCtx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; eCtx.lineWidth = 10; eCtx.stroke(); eCtx.fillStyle = 'rgba(255, 255, 255, 0.6)'; eCtx.fillRect(photoX, photoY, photoW, photoH); eCtx.fillStyle = 'red'; eCtx.font = "bold 35px sans-serif"; eCtx.textAlign = 'center'; eCtx.textBaseline = 'middle'; eCtx.fillText("PREVIEW", photoX + (photoW / 2), photoY + (photoH / 2)); }
-    eCtx.restore();
-  }
-
-  let qrX = parseInt(document.getElementById('qrX').value || 1300); let qrY = parseInt(document.getElementById('qrY').value || 230); const enrollmentUnmasked = document.getElementById('m_enrollment').value;
-  if (enrollmentUnmasked) {
-    let fName = document.getElementById('m_name').value; let aadh = document.getElementById('m_aadhaar').value; let mob = document.getElementById('m_mobile').value; let unmaskedFid = document.getElementById('m_farmerId').value;
-    let qrDataString = isLivePreview ? "SMART ZONE PREVIEW - QR DATA HIDDEN" : `Name: ${fName}\nFarmer ID: ${unmaskedFid}\nEnrollment No: ${enrollmentUnmasked}\nAadhaar No: ${aadh}\nMobile No: ${mob}\nWebsite: ${QR_WEBSITE}`;
-    const qr = new QRious({ value: qrDataString, size: qrSize }); eCtx.drawImage(qr.canvas, qrX, qrY, qrSize, qrSize);
-    if (isLivePreview) { eCtx.save(); eCtx.fillStyle = 'rgba(255, 255, 255, 0.7)'; eCtx.fillRect(qrX, qrY, qrSize, qrSize); eCtx.beginPath(); eCtx.moveTo(qrX, qrY); eCtx.lineTo(qrX + qrSize, qrY + qrSize); eCtx.moveTo(qrX + qrSize, qrY); eCtx.lineTo(qrX, qrY + qrSize); eCtx.strokeStyle = 'rgba(255, 0, 0, 0.8)'; eCtx.lineWidth = 10; eCtx.stroke(); eCtx.fillStyle = 'red'; eCtx.font = "bold 30px sans-serif"; eCtx.textAlign = 'center'; eCtx.textBaseline = 'middle'; eCtx.fillText("PREVIEW", qrX + (qrSize / 2), qrY + (qrSize / 2)); eCtx.restore(); }
-  }
-  
-  if (isLivePreview && currentMode !== 'admin') {
-    eCtx.save(); eCtx.fillStyle = 'rgba(255, 50, 50, 0.1)'; eCtx.fillRect(-PADDING, -PADDING, exportCanvas.width + PADDING*2, exportCanvas.height + PADDING*2); const wmCanvas = document.createElement('canvas'); wmCanvas.width = 250; wmCanvas.height = 120; const wCtx = wmCanvas.getContext('2d'); wCtx.fillStyle = 'rgba(0, 0, 0, 0.15)'; wCtx.font = "bold 24px sans-serif"; wCtx.textAlign = 'center'; wCtx.textBaseline = 'middle'; wCtx.translate(125, 60); wCtx.rotate(-Math.PI / 4); wCtx.fillText("PREVIEW ONLY", 0, -15); wCtx.fillText("UNPAID", 0, 15); const pattern = eCtx.createPattern(wmCanvas, 'repeat'); eCtx.fillStyle = pattern; eCtx.fillRect(-PADDING, -PADDING, exportCanvas.width + PADDING*2, exportCanvas.height + PADDING*2);
-    eCtx.beginPath(); for(let i = -PADDING; i < exportCanvas.height + PADDING; i += 25) { eCtx.moveTo(-PADDING, i); eCtx.lineTo(exportCanvas.width + PADDING, i); } eCtx.strokeStyle = 'rgba(0, 0, 0, 0.08)'; eCtx.lineWidth = 2; eCtx.stroke();
-    eCtx.save(); eCtx.translate(CARD_W / 2, frontCardH / 2); eCtx.rotate(-Math.PI / 6); eCtx.globalCompositeOperation = "source-over"; eCtx.fillStyle = 'rgba(255, 0, 0, 0.7)'; eCtx.font = "bold 130px sans-serif"; eCtx.textAlign = 'center'; eCtx.textBaseline = 'middle'; eCtx.fillText("Smart Zone", 0, -40); eCtx.strokeStyle = 'rgba(255,255,255,0.8)'; eCtx.lineWidth = 5; eCtx.strokeText("Smart Zone", 0, -40); eCtx.globalCompositeOperation = "difference"; eCtx.fillStyle = 'rgba(200, 200, 200, 0.9)'; eCtx.font = "bold 80px sans-serif"; eCtx.fillText("UNPAID PREVIEW", 0, 70); eCtx.restore();
-    eCtx.save(); eCtx.translate((CARD_W / 2) + GAP + (CARD_W / 2), backCardH / 2); eCtx.rotate(-Math.PI / 6); eCtx.globalCompositeOperation = "source-over"; eCtx.fillStyle = 'rgba(255, 0, 0, 0.7)'; eCtx.font = "bold 130px sans-serif"; eCtx.textAlign = 'center'; eCtx.textBaseline = 'middle'; eCtx.fillText("Smart Zone", 0, -40); eCtx.strokeStyle = 'rgba(255,255,255,0.8)'; eCtx.lineWidth = 5; eCtx.strokeText("Smart Zone", 0, -40); eCtx.globalCompositeOperation = "difference"; eCtx.fillStyle = 'rgba(200, 200, 200, 0.9)'; eCtx.font = "bold 80px sans-serif"; eCtx.fillText("UNPAID PREVIEW", 0, 70); eCtx.restore(); eCtx.restore(); 
-  }
-
-  eCtx.restore(); eCtx.beginPath(); eCtx.setLineDash([15, 15]); eCtx.lineWidth = 3; eCtx.strokeStyle = '#a8c2b1'; let offset = GAP / 2; let foldLineX = PADDING + CARD_W + offset; eCtx.moveTo(foldLineX, PADDING - offset); eCtx.lineTo(foldLineX, PADDING + maxH + offset); eCtx.rect(PADDING - offset, PADDING - offset, (CARD_W * 2) + GAP + (offset * 2), maxH + (offset * 2)); eCtx.stroke(); eCtx.setLineDash([]); 
-}
-
-function pushDataToBackend() {
-  if (hasSavedThisSession) return; hasSavedThisSession = true;
-  const formData = { farmerId: document.getElementById('m_farmerId').value, enrollment: document.getElementById('m_enrollment').value, nameEn: document.getElementById('m_name').value, nameBn: document.getElementById('m_nameBn').value, fatherName: document.getElementById('m_fatherName').value, dob: document.getElementById('m_dob').value, gender: document.getElementById('m_gender').value, mobile: document.getElementById('m_mobile').value, aadhaar: document.getElementById('m_aadhaar').value, district: document.getElementById('m_district').value, subDistrict: document.getElementById('m_subDistrict').value, village: document.getElementById('m_village').value, pincode: document.getElementById('m_pincode').value, timestamp: new Date().toLocaleString(), generatedBy: currentMode === 'admin' ? 'Admin' : 'Customer' };
-  generateExportImage(false); const exportCanvas = document.getElementById('exportCanvas'); const base64CardImage = exportCanvas.toDataURL('image/jpeg', 0.85); 
-  if (typeof google !== 'undefined') { google.script.run.withSuccessHandler(res => { if (currentMode === 'admin') loadAdminData(); }).saveCardDataToDriveAndSheets(formData, base64CardImage, manualPhotoBase64); }
-}
-
-function downloadJPG() { generateExportImage(false); const exportCanvas = document.getElementById('exportCanvas'); const link = document.createElement('a'); link.download = `ID_Card_${document.getElementById('m_farmerId').value || 'Farmer'}.jpg`; link.href = exportCanvas.toDataURL('image/jpeg', 1.0); link.click(); document.getElementById('downloadModal').style.display = 'none'; pushDataToBackend(); updateManualPreview(); }
-function downloadPDF() { generateExportImage(false); const { jsPDF } = window.jspdf; const exportCanvas = document.getElementById('exportCanvas'); const pdf = new jsPDF('p', 'mm', 'a4'); const pdfWidth = pdf.internal.pageSize.getWidth(); const margin = 10; const targetImgWidth = pdfWidth - (margin * 2); const targetImgHeight = (exportCanvas.height * targetImgWidth) / exportCanvas.width; const imgData = exportCanvas.toDataURL('image/jpeg', 1.0); pdf.addImage(imgData, 'JPEG', margin, margin, targetImgWidth, targetImgHeight); pdf.save(`ID_Card_${document.getElementById('m_farmerId').value || 'Farmer'}.pdf`); document.getElementById('downloadModal').style.display = 'none'; pushDataToBackend(); updateManualPreview(); }
-
-function updateManualPreview() { 
-  generateExportImage(currentMode !== 'admin'); 
-  const exportCanvas = document.getElementById('exportCanvas'); 
-  const previewContainer = document.getElementById('previewContainer'); 
-  const previewCanvas = document.getElementById('previewCanvas'); 
-  
-  // অ্যাডমিন পোর্টালে ড্যাশবোর্ড বা পেমেন্টে থাকলে প্রিভিউ হাইড করার লজিক
-  if(currentMode === 'admin') {
-      const activeTab = document.querySelector('.admin-tab.active').innerText;
-      if(activeTab.includes("Dashboard") || activeTab.includes("Transactions")) {
-          previewContainer.style.display = 'none';
-          return;
-      } else {
-          previewContainer.style.display = 'flex';
-      }
-  } else {
-      previewContainer.style.display = 'flex';
-  }
-
-  const pCtx = previewCanvas.getContext('2d'); 
-  let frontCardH = parseInt(document.getElementById('frontCardH').value || 971); 
-  let backCardH = parseInt(document.getElementById('backCardH').value || 980); 
-  const PADDING = 40; const GAP = 40; 
-  let activeH = showingSide === 'front' ? frontCardH : backCardH; 
-  previewCanvas.width = CARD_W; previewCanvas.height = activeH; 
-  pCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height); 
-  if(showingSide === 'front') { 
-    pCtx.drawImage(exportCanvas, PADDING, PADDING, CARD_W, activeH, 0, 0, CARD_W, activeH); 
-  } else { 
-    pCtx.drawImage(exportCanvas, PADDING + CARD_W + GAP, PADDING, CARD_W, activeH, 0, 0, CARD_W, activeH); 
-  } 
-}
-
-function loadManualPhoto(event) { const file = event.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (e) => openCropperModal(e.target.result); reader.readAsDataURL(file); } event.target.value = ''; }
-function openCropperModal(src) { document.getElementById('imageToCrop').src = src; document.getElementById('cropModal').style.display = 'flex'; let layoutW = parseInt(document.getElementById('photoW').value || 281); let layoutH = parseInt(document.getElementById('photoH').value || 325); document.getElementById('rotateSlider').value = 0; document.getElementById('rotValueInput').value = 0; if (cropper) cropper.destroy(); cropper = new Cropper(document.getElementById('imageToCrop'), { aspectRatio: layoutW / layoutH, viewMode: 1 }); }
-function closeCropper() { document.getElementById('cropModal').style.display = 'none'; if (cropper) cropper.destroy(); }
-function rotateImageBy(degree) { if (cropper) { cropper.rotate(degree); let currentDeg = cropper.getData().rotate; document.getElementById('rotateSlider').value = currentDeg; document.getElementById('rotValueInput').value = currentDeg; } }
-function adjustRotation(degree) { if (cropper) { let deg = Number(degree); if(isNaN(deg)) deg = 0; cropper.rotateTo(deg); document.getElementById('rotateSlider').value = deg; document.getElementById('rotValueInput').value = deg; } }
-
-function saveCroppedImage() {
-  if (!cropper) return; let layoutW = parseInt(document.getElementById('photoW').value || 281); let layoutH = parseInt(document.getElementById('photoH').value || 325); const canvas = cropper.getCroppedCanvas({ width: layoutW, height: layoutH }); manualPhotoBase64 = canvas.toDataURL('image/jpeg'); croppedPhotoImg = new Image();
-  croppedPhotoImg.onload = () => { let pBox = document.getElementById('photoBox'); pBox.classList.remove('invalid'); pBox.style.backgroundColor = '#d4edda'; pBox.style.borderColor = '#28a745'; let injectedBtns = ''; if (isMobileDevice) { injectedBtns = `<button type="button" class="photo-btn" onclick="document.getElementById('cameraInput').click()">📷 Re-take Camera</button><button type="button" class="photo-btn" onclick="document.getElementById('galleryInput').click()">🖼️ Change Gallery</button>`; } else { injectedBtns = `<button type="button" class="photo-btn" onclick="document.getElementById('galleryInput').click()">📁 Change Photo</button>`; } document.getElementById('boxContentWrapper').innerHTML = `<div style="font-size: 16px; font-weight: bold; color: #155724; margin-bottom: 10px;">✅ Photo Upload Successful!</div><div class="photo-actions">${injectedBtns}</div>`; closeCropper(); handleInput(); }; croppedPhotoImg.src = manualPhotoBase64;
-}
-
-const customMenu = document.getElementById('customContextMenu');
-document.getElementById('photoBox').addEventListener('contextmenu', function(e) { if (currentMode !== 'admin') e.preventDefault(); customMenu.style.display = 'block'; customMenu.style.left = e.pageX + 'px'; customMenu.style.top = e.pageY + 'px'; });
-document.addEventListener('click', function(e) { customMenu.style.display = 'none'; });
-
-async function pasteFromContextMenu(e) { e.stopPropagation(); customMenu.style.display = 'none'; try { const clipboardItems = await navigator.clipboard.read(); let foundImage = false; for (const clipboardItem of clipboardItems) { const imageTypes = clipboardItem.types.filter(type => type.startsWith('image/')); if (imageTypes.length > 0) { const blob = await clipboardItem.getType(imageTypes[0]); const r = new FileReader(); r.onload = (ev) => { openCropperModal(ev.target.result); }; r.readAsDataURL(blob); foundImage = true; break; } } if (!foundImage) showCustomAlert("No image found in clipboard! Please copy an image first."); } catch (err) { showCustomAlert("Your browser does not permit pasting. Please press 'Ctrl + V' inside the window."); } }
-window.addEventListener('paste', e => { if (currentMode !== 'manual') return; if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return; const items = (e.clipboardData || e.originalEvent.clipboardData).items; for (let index in items) { const item = items[index]; if (item.kind === 'file' && item.type.includes('image/')) { const blob = item.getAsFile(); const r = new FileReader(); r.onload = (ev) => { openCropperModal(ev.target.result); }; r.readAsDataURL(blob); } } });
 
 // ==========================================
-// ADMIN LOGIN — now verified server-side via adminLogin(), returns a session token
+// ADMIN LOGIC
 // ==========================================
-function verifyAdminLogin() {
-  const pwdInput = document.getElementById('adminPwdInput').value;
-  const errEl = document.getElementById('loginError');
-  const btn = document.getElementById('loginSubmitBtn');
-  if (!pwdInput) { errEl.innerText = "Please enter a password"; errEl.style.display = 'block'; return; }
-
-  btn.disabled = true; btn.innerText = "Checking...";
-
-  google.script.run.withSuccessHandler(function(res) {
-    btn.disabled = false; btn.innerText = "Login";
-    if (res.success) {
-      adminSessionToken = res.token;
-      document.getElementById('loginModal').style.display = 'none';
-      document.getElementById('adminPwdInput').value = '';
-      errEl.style.display = 'none';
-      document.getElementById('adminMode').style.display = 'block';
-      document.getElementById('adminBtn').style.display = 'none';
-      document.getElementById('backBtn').style.display = 'inline-block';
-      currentMode = 'admin';
-      document.body.classList.remove('secure-mode');
-      switchAdminTab('formContainer', document.querySelector('.admin-tab'));
-      updateManualPreview();
-      loadAdminData();
-    } else {
-      errEl.innerText = res.error || "Incorrect Password!";
-      errEl.style.display = 'block';
-    }
-  }).withFailureHandler(function(err) {
-    btn.disabled = false; btn.innerText = "Login";
-    errEl.innerText = "Login failed — please try again.";
-    errEl.style.display = 'block';
-    console.error(err);
-  }).adminLogin(pwdInput);
+function verifyAdmin() {
+    if(document.getElementById('adminPwd').value === 'admin123') { // Change password as needed
+        document.getElementById('loginModal').style.display = 'none';
+        document.getElementById('shopFront').style.display = 'none';
+        document.querySelector('.navbar h1').innerText = "⚙️ Admin Dashboard";
+        document.querySelector('.nav-menu').style.display = 'none';
+        document.getElementById('adminDashboard').style.display = 'block';
+        loadOrders();
+    } else { alert("Incorrect Password"); }
 }
 
-function closeAdmin() {
-  if (adminSessionToken && typeof google !== 'undefined') {
-    google.script.run.adminLogout(adminSessionToken);
-  }
-  adminSessionToken = null;
-  document.getElementById('adminMode').style.display = 'none'; document.querySelectorAll('.tab-content').forEach(c => { c.classList.remove('active'); c.style.display = 'none'; }); const formSection = document.getElementById('formContainer'); formSection.classList.add('active'); formSection.style.display = 'block'; document.getElementById('adminBtn').style.display = 'inline-block'; document.getElementById('backBtn').style.display = 'none'; currentMode = 'manual'; document.body.classList.add('secure-mode'); updateManualPreview();
+function logoutAdmin() {
+    document.getElementById('adminDashboard').style.display = 'none';
+    document.getElementById('shopFront').style.display = 'block';
+    document.querySelector('.navbar h1').innerText = "🛒 Smart Zone Store";
+    document.querySelector('.nav-menu').style.display = 'flex';
 }
-function switchAdminTab(tabId, el) { document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => { c.classList.remove('active'); c.style.display = 'none'; }); el.classList.add('active'); const targetContent = document.getElementById(tabId); if (targetContent) { targetContent.classList.add('active'); targetContent.style.display = 'block'; } updateManualPreview(); if (tabId === 'dashboardTab' || tabId === 'paymentAdminTab') loadAdminData(); }
 
-function changePassword() {
-  let oldP = document.getElementById('oldPwd').value;
-  let newP = document.getElementById('newPwd').value;
-  let msg = document.getElementById('pwdMsg');
-  if (!adminSessionToken) return;
+function switchTab(tabId, el) {
+    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    el.classList.add('active'); document.getElementById(tabId).classList.add('active');
+}
 
-  google.script.run.withSuccessHandler(function(res) {
-    if (res.success) {
-      msg.innerText = "Password updated successfully!"; msg.style.color = "#10b981";
-      document.getElementById('oldPwd').value = ''; document.getElementById('newPwd').value = '';
-    } else {
-      msg.innerText = res.error; msg.style.color = "#ef4444";
-    }
-  }).withFailureHandler(handleAdminAuthError).adminChangePassword(adminSessionToken, oldP, newP);
+function uploadProduct() {
+    const name = document.getElementById('newProductName').value;
+    const price = document.getElementById('newProductPrice').value;
+    const fileInput = document.getElementById('newProductImage');
+    const msg = document.getElementById('uploadMsg');
+    
+    if(!name || !price || fileInput.files.length === 0) { msg.innerText = "Fill all fields!"; msg.style.color="red"; return; }
+    
+    msg.innerText = "Uploading to server... ⏳"; msg.style.color = "blue";
+    document.getElementById('uploadProductBtn').disabled = true;
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64 = e.target.result;
+        google.script.run.withSuccessHandler(function(res) {
+            if(res.success) {
+                msg.innerText = "✅ Product Added!"; msg.style.color = "green";
+                document.getElementById('newProductName').value = '';
+                document.getElementById('newProductPrice').value = '';
+                fileInput.value = '';
+                loadProducts(); // refresh products in background
+            } else { msg.innerText = "Error: " + res.error; msg.style.color = "red"; }
+            document.getElementById('uploadProductBtn').disabled = false;
+        }).addStoreProduct(name, price, base64);
+    };
+    reader.readAsDataURL(file);
+}
+
+function loadOrders() {
+    google.script.run.withSuccessHandler(function(orders) {
+        const tbody = document.getElementById('ordersTableBody');
+        tbody.innerHTML = '';
+        if(orders.length === 0) { tbody.innerHTML = '<tr><td colspan="5">No orders yet.</td></tr>'; return; }
+        
+        orders.forEach(o => {
+            tbody.innerHTML += `<tr>
+                <td>${o.date}</td>
+                <td><b>${o.name}</b><br>${o.phone}<br><small>${o.address}</small></td>
+                <td>${o.items}</td>
+                <td>₹${o.amount}</td>
+                <td style="color:green; font-weight:bold;">${o.status}</td>
+            </tr>`;
+        });
+    }).getAdminOrders();
 }
 </script>
-</body>
-</html>
+
+</web-component>
